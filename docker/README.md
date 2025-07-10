@@ -39,3 +39,19 @@ docker가 설치되어 있지 않다면 [docker 설치 스크립트](install-doc
 1. 스크립트 파일에 실행 권한을 부여합니다. `chmod +x install-docker.sh`
 2. 스크립트를 실행합니다. `your-path/docker/install-docker.sh`
 3. docker 설치를 적용합니다. `newgrp docker`
+
+# Git clone 가이드
+
+
+이 프로젝트는 `docker/`, `EDA/`, `utils/` 등 서로 다른 리소스 환경에서 사용하는 디렉토리로 구성되어 있습니다.  
+전체 리포를 클론하지 않고 필요한 디렉토리만 선택적으로 가져오려면 `sparse checkout` 기능을 사용할 수 있습니다.
+
+`docker/` 디렉토리만 클론
+
+```bash
+git clone --filter=blob:none --sparse https://github.com/your-org/project.git
+cd project
+git sparse-checkout init --cone
+git sparse-checkout set docker
+cd docker
+./install-docker.sh
