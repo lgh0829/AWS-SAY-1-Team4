@@ -1,0 +1,30 @@
+# SageMaker 훈련 설정
+entry_point: "train.py"
+source_dir: "../src"
+instance_count: 1
+instance_type: "ml.p3.2xlarge"  # GPU 인스턴스
+framework_version: "1.12.0"  # PyTorch 버전
+py_version: "py312"  # Python 버전
+
+# 데이터 설정
+bucket_name: "your-bucket-name"
+upload_data: true
+data:
+  train_dir: "/path/to/local/train"
+  val_dir: "/path/to/local/val"
+  train_prefix: "processed-dataset/train"
+  val_prefix: "processed-dataset/val"
+
+# MLflow 설정
+mlflow:
+  tracking_uri: "http://your-mlflow-server:5000"
+  experiment_name: "chest-xray-classification"
+
+# 하이퍼파라미터
+hyperparameters:
+  epochs: 20
+  batch_size: 32
+  learning_rate: 0.0001
+  model_type: "resnet50"
+  num_classes: 3
+  patience: 5
