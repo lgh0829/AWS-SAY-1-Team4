@@ -1,0 +1,54 @@
+# config.yaml
+project:
+  name: "pneumonia-detection"
+  version: "1.0.0"
+
+# AWS 설정 - 여기를 실제 값으로 수정해주세요
+aws:
+  region: "ap-northeast-2"  # 실제 사용할 리전
+  s3:
+    bucket: "say1-4team-bucket"  # 실제 S3 버킷 이름
+    prefix: "cxr-pneumonia"
+    # data_path: ""  # S3에서 데이터가 저장된 경로
+    # model_path: "models"
+    # code_path: "code"
+  
+  sagemaker:
+    role: "arn:aws:iam::666803869796:role/SKKU_SageMaker_Role"  # 실제 IAM 역할 ARN
+    instance_types:
+      training: "ml.g4dn.xlarge"  # GPU 학습용
+      inference: "ml.t3.medium"   # CPU 추론용
+      processing: "ml.m5.xlarge" # 전처리용
+
+# 모델 설정
+model:
+  framework: "pytorch"
+  framework_version: "1.12.0"
+  python_version: "py38"
+  
+  training:
+    epochs: 50
+    batch_size: 32
+    learning_rate: 0.001
+
+# 환경별 설정
+environments:
+  development:
+    aws:
+      sagemaker:
+        instance_types:
+          training: "ml.m5.large"  # 개발 시에는 저렴한 인스턴스
+    model:
+      training:
+        epochs: 5
+        batch_size: 16
+  
+  production:
+    aws:
+      sagemaker:
+        instance_types:
+          training: "ml.p3.2xlarge"
+    model:
+      training:
+        epochs: 100
+        batch_size: 32
