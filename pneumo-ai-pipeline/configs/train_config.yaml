@@ -5,20 +5,26 @@ instance_count: 1
 instance_type: "ml.g4dn.xlarge"  # GPU 인스턴스
 framework_version: "1.12.0"  # PyTorch 버전
 py_version: "py312"  # Python 버전
+base_job_name: "aws-say1-4team"  # SageMaker 작업 이름
 
 # 데이터 설정
-bucket_name: ${S3_BUCKET_NAME}  # S3 버킷 이름
-upload_data: true
-data:
-  train_dir: "/path/to/local/train"
-  val_dir: "/path/to/local/val"
-  train_prefix: "processed-dataset/train"
-  val_prefix: "processed-dataset/val"
+upload_data: True
+s3:
+  bucket_name: "${S3_BUCKET_NAME}"  # S3 버킷 이름
+  prefix: "cxr-pneumonia-3"
+  train_prefix: "preprocessed/train"
+  val_prefix: "preprocessed/val"
+  test_prefix: "preprocessed/test"
+local:
+  data_dir: "../data"  # 로컬 데이터 디렉토리
+  train_dir: "train"
+  val_dir: "val"
+  test_dir: "test"
 
 # MLflow 설정
 mlflow:
   tracking_uri: "http://your-mlflow-server:5000"
-  experiment_name: "chest-xray-classification"
+  experiment_name: "pneumoniaClassification"
 
 # 하이퍼파라미터
 hyperparameters:

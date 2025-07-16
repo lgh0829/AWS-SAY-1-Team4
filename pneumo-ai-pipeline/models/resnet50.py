@@ -1,0 +1,171 @@
+import os
+import argparse
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torchvision import datasets, transforms, models
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+import mlflow
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    
+    # SageMaker 기본 인자
+    parser.add_argument('--model-dir', type=str, default=os.environ.get('SM_MODEL_DIR'))
+    parser.add_argument('--train', type=str, default=os.environ.get('SM_CHANNEL_TRAIN'))
+    parser.add_argument('--val', type=str, default=os.environ.get('SM_CHANNEL_VAL'))
+    parser.add_argument('--test', type=str, default=os.environ.get('SM_CHANNEL_TEST'))
+    
+    # 하이퍼파라미터
+    parser.add_argument('--epochs', type=int, default=20)
+    parser.add_argument('--batch-size', type=int, default=32)
+    parser.add_argument('--learning-rate', type=float, default=0.0001)
+    parser.add_argument('--model-type', type=str, default='resnet50')
+    parser.add_argument('--num-classes', type=int, default=3)
+    parser.add_argument('--patience', type=int, default=5)
+    
+    return parser.parse_args()
+
+def get_transforms():
+    data_transforms = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    ])
+    
+    train_transforms = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomRotation(10),
+        transforms.ColorJitter(brightness=0.1, contrast=0.1),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    ])
+    
+    return train_transforms, data_transforms
+
+def create_model(model_type, num_classes, device):
+    if model_type == 'resnet50':
+        model = models.resnet50(weights='IMAGENET1K_V1')
+        model.fc = nn.Linear(model.fc.in_features, num_classes)
+    return model.to(device)
+
+def train_epoch(model, train_loader, criterion, optimizer, device):
+    model.train()
+    running_loss = 0.0
+    correct = 0
+    total = 0
+    
+    with tqdm(train_loader, desc='Training') as pbar:
+        for images, labels in pbar:
+            images, labels = images.to(device), labels.to(device)
+            
+            optimizer.zero_grad()
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+            
+            running_loss += loss.item()
+            _, predicted = outputs.max(1)
+            total += labels.size(0)
+            correct += predicted.eq(labels).sum().item()
+            
+            pbar.set_postfix({'loss': f'{loss.item():.4f}', 
+                            'acc': f'{100.*correct/total:.2f}%'})
+    
+    return running_loss / len(train_loader), 100. * correct / total
+
+def validate(model, val_loader, criterion, device):
+    model.eval()
+    val_loss = 0.0
+    correct = 0
+    total = 0
+    
+    with torch.no_grad():
+        for images, labels in val_loader:
+            images, labels = images.to(device), labels.to(device)
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+            
+            val_loss += loss.item()
+            _, predicted = outputs.max(1)
+            total += labels.size(0)
+            correct += predicted.eq(labels).sum().item()
+    
+    return val_loss / len(val_loader), 100. * correct / total
+
+def main():
+    args = parse_args()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
+    
+    # 데이터 로더 설정
+    train_transforms, data_transforms = get_transforms()
+    
+    train_dataset = datasets.ImageFolder(args.train, transform=train_transforms)
+    val_dataset = datasets.ImageFolder(args.val, transform=data_transforms)
+    test_dataset = datasets.ImageFolder(args.test, transform=data_transforms)
+    
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size)
+    test_loader = DataLoader(test_dataset, batch_size=args.batch_size)
+    
+    # 모델 설정
+    model = create_model(args.model_type, args.num_classes, device)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', 
+                                                    factor=0.1, patience=3)
+    
+    # MLflow 실험 시작
+    with mlflow.start_run():
+        mlflow.log_params(vars(args))
+        
+        best_val_acc = 0.0
+        patience_counter = 0
+        
+        for epoch in range(args.epochs):
+            # 훈련
+            train_loss, train_acc = train_epoch(model, train_loader, 
+                                              criterion, optimizer, device)
+            
+            # 검증
+            val_loss, val_acc = validate(model, val_loader, criterion, device)
+            
+            # 로그 기록
+            mlflow.log_metrics({
+                'train_loss': train_loss,
+                'train_accuracy': train_acc,
+                'val_loss': val_loss,
+                'val_accuracy': val_acc
+            }, step=epoch)
+            
+            print(f"Epoch {epoch+1}/{args.epochs}")
+            print(f"Train Loss: {train_loss:.4f}, Acc: {train_acc:.2f}%")
+            print(f"Val Loss: {val_loss:.4f}, Acc: {val_acc:.2f}%")
+            
+            # Early Stopping 체크
+            if val_acc > best_val_acc:
+                best_val_acc = val_acc
+                patience_counter = 0
+                # 모델 저장
+                model_path = os.path.join(args.model_dir, 'model.pth')
+                torch.save(model.state_dict(), model_path)
+                mlflow.log_artifact(model_path)
+            else:
+                patience_counter += 1
+                if patience_counter >= args.patience:
+                    print(f"Early stopping at epoch {epoch+1}")
+                    break
+            
+            scheduler.step(val_acc)
+        
+        # 최종 테스트
+        test_loss, test_acc = validate(model, test_loader, criterion, device)
+        print(f"Final Test Accuracy: {test_acc:.2f}%")
+        mlflow.log_metric('test_accuracy', test_acc)
+
+if __name__ == '__main__':
+    main()
