@@ -1,24 +1,41 @@
+import os
+import sys
+from pathlib import Path
 import cv2
 import numpy as np
 import torch
-from inference import inference
-from lungs_segmentation.pre_trained_models import create_model
+from .lungs_seg.inference import inference
+from .lungs_seg.pre_trained_models import create_model
 import os
 
 class LungSegmenter:
     def __init__(self, model_type='resnet34', device=None):
         # 디바이스 자동 선택
-        self.device = device or ('cuda' if torch.cuda.is_available() else 
-                                'mps' if torch.backends.mps.is_available() else 'cpu')
-        print(f"Using device: {self.device}")
+        if device is None:
+            if torch.cuda.is_available():
+                self.device = 'cuda'
+            elif torch.backends.mps.is_available():
+                self.device = 'mps'
+            else:
+                self.device = 'cpu'
+        else:
+            self.device = device
         
         # 모델 로드
         self.model = create_model(model_type).to(device=self.device)
         self.model.eval()
     
-    def segment_image(self, image_path):
-        """단일 이미지에서 폐 영역 분할"""
-        _, mask = inference(self.model, image_path)
+    def segment_image(self, image_path, output_path=None):
+        """단일 이미지에서 폐 영역 분할 및 저장
+        
+        Args:
+            image_path (str): 입력 이미지 경로
+            output_path (str, optional): 출력 이미지 저장 경로. 기본값은 None
+        
+        Returns:
+            tuple: (masked_img, combined_mask, original_img) 튜플
+        """
+        _, mask = inference(self.model, image_path, thresh=0.2)
         
         # 좌우 폐 마스크 결합
         combined_mask = (mask[0] + mask[1]) > 0
@@ -32,6 +49,13 @@ class LungSegmenter:
         binary_mask_3ch = np.stack([combined_mask]*3, axis=-1)
         binary_mask_3ch = binary_mask_3ch // 255
         masked_img = original_img * binary_mask_3ch
+
+        # 결과 이미지 저장 (output_path가 제공된 경우)
+        if output_path:
+            output_dir = os.path.dirname(output_path)
+            if output_dir:
+                os.makedirs(output_dir, exist_ok=True)
+            cv2.imwrite(output_path, masked_img)
         
         return masked_img, combined_mask, original_img
     

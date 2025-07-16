@@ -18,6 +18,7 @@ sdist/
 var/
 *.whl
 *.venv
+**/.env
 
 # Environments
 .env
@@ -44,3 +45,8 @@ Thumbs.db
 
 # User-specified large data/output directories
 experiments/
+
+# Data directories
+**/data/
+**/data/**
+data/
