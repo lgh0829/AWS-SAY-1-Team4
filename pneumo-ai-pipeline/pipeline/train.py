@@ -11,7 +11,6 @@ import yaml
 import os
 import re
 from torch.optim import lr_scheduler
-from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
 import sagemaker
 from sagemaker.pytorch import PyTorch
@@ -61,197 +60,101 @@ def load_config(config_path):
     config = process_yaml_dict(config)
     return config
 
-# data_transforms = transforms.Compose([
-#     transforms.Resize((224, 224)),  # ResNet 입력 크기
-#     transforms.ToTensor(),
-#     transforms.Normalize([0.485, 0.456, 0.406],
-#                          [0.229, 0.224, 0.225])
-# ])
-
-# train_transforms = transforms.Compose([
-#     transforms.Resize((224, 224)),
-#     transforms.RandomHorizontalFlip(),
-#     transforms.RandomRotation(10),
-#     transforms.ColorJitter(brightness=0.1, contrast=0.1),
-#     transforms.ToTensor(),
-#     transforms.Normalize([0.485, 0.456, 0.406],
-#                          [0.229, 0.224, 0.225])
-# ])
-
-# train_dataset = datasets.ImageFolder('/Users/skku_aws19/Desktop/aws_project/pre-project/data/train_preprocessed', transform=train_transforms)
-# train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-# val_dataset = datasets.ImageFolder('/Users/skku_aws19/Desktop/aws_project/pre-project/data/val_preprocessed', transform=data_transforms)
-# val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
-# test_dataset = datasets.ImageFolder('/Users/skku_aws19/Desktop/aws_project/pre-project/data/test_preprocessed', transform=data_transforms)
-# test_loader = DataLoader(test_dataset,batch_size=32, shuffle=False)
-
-# model = models.resnet50(weights='IMAGENET1K_V1')
-# model.fc = nn.Linear(model.fc.in_features, 3)  # 3-class classification
-# model = model.to(device)
-
-# criterion = nn.CrossEntropyLoss()
-# optimizer = optim.Adam(model.parameters(), lr=1e-4)
-
-
-# # TensorBoard 설정
-# log_dir = './runs/pneumonia_' + datetime.now().strftime('%Y%m%d-%H%M%S')
-# writer = SummaryWriter(log_dir=log_dir)
-
-# # 모델 구조 시각화 (1회만)
-# example_input = torch.randn(1, 3, 224, 224).to(device)
-# writer.add_graph(model, example_input)
-
-# # 옵티마이저 정보 기록
-# writer.add_text("Model", model._get_name())
-# writer.add_text("Loss Function", criterion._get_name())
-# writer.add_text("Device", str(device))
-# opt_params = optimizer.__getstate__()['defaults']
-# opt_text = '\n'.join([f"{k}: {v}" for k, v in opt_params.items()])
-# writer.add_text("Optimizer Parameters", opt_text)
-
-# # 하이퍼파라미터
-# num_epochs = 20
-# patience = 5
-# best_val_acc = 0.0
-# patience_counter = 0
-
-# # 학습 루프
-# for epoch in range(num_epochs):
-#     print(f"\n📘 Epoch [{epoch+1}/{num_epochs}]")
+def check_s3_images(session, bucket, prefix):
+    """S3 경로에 이미지 파일이 있는지 확인"""
+    s3_client = session.boto_session.client('s3')
     
-#     model.train()
-#     running_loss, running_correct, total = 0.0, 0, 0
-
-#     train_loop = tqdm(train_loader, desc="Training", leave=False)
-#     for images, labels in train_loop:
-#         images, labels = images.to(device), labels.to(device)
-
-#         optimizer.zero_grad()
-#         outputs = model(images)
-#         loss = criterion(outputs, labels)
-#         loss.backward()
-#         optimizer.step()
-
-#         running_loss += loss.item()
-#         _, predicted = outputs.max(1)
-#         total += labels.size(0)
-#         running_correct += predicted.eq(labels).sum().item()
-
-#         train_loop.set_postfix({
-#             "Loss": f"{loss.item():.4f}",
-#             "Acc": f"{100. * running_correct / total:.2f}%"
-#         })
-
-#     train_acc = 100. * running_correct / total
-#     train_loss = running_loss / len(train_loader)
-
-#     # ✅ Validation
-#     model.eval()
-#     val_loss, val_correct, val_total = 0.0, 0, 0
-
-#     val_loop = tqdm(val_loader, desc="Validating", leave=False)
-#     with torch.no_grad():
-#         for images, labels in val_loop:
-#             images, labels = images.to(device), labels.to(device)
-#             outputs = model(images)
-#             loss = criterion(outputs, labels)
-#             val_loss += loss.item()
-#             _, predicted = outputs.max(1)
-#             val_total += labels.size(0)
-#             val_correct += predicted.eq(labels).sum().item()
-
-#             val_loop.set_postfix({
-#                 "Loss": f"{loss.item():.4f}",
-#                 "Acc": f"{100. * val_correct / val_total:.2f}%"
-#             })
-
-#     val_acc = 100. * val_correct / val_total
-#     val_loss /= len(val_loader)
-
-#     print(f"✅ Epoch {epoch+1} | Train Loss: {train_loss:.4f}, Acc: {train_acc:.2f}% | Val Loss: {val_loss:.4f}, Acc: {val_acc:.2f}%")
-
-#     # ✅ TensorBoard에 기록
-#     writer.add_scalar("Loss/train", train_loss, epoch)
-#     writer.add_scalar("Loss/val", val_loss, epoch)
-#     writer.add_scalar("Accuracy/train", train_acc, epoch)
-#     writer.add_scalar("Accuracy/val", val_acc, epoch)
-
-#     # ✅ Early Stopping & Save Best
-#     if val_acc > best_val_acc:
-#         best_val_acc = val_acc
-#         patience_counter = 0
-#         torch.save(model.state_dict(), "best_model_augmented.pth")
-#         print(f"💾 모델 저장됨 (val acc: {val_acc:.2f}%)")
-#     else:
-#         patience_counter += 1
-#         if patience_counter >= patience:
-#             print(f"🛑 Early stopping at epoch {epoch+1}")
-#             break
-
-#     # ✅ Scheduler 업데이트
-#     scheduler.step(val_acc)
-
-# writer.close()
-# print("🏁 학습 완료")
+    # 이미지 파일 확장자
+    image_extensions = {'.jpg', '.jpeg', '.png'}
+    
+    try:
+        # S3 객체 리스트 가져오기
+        response = s3_client.list_objects_v2(
+            Bucket=bucket,
+            Prefix=prefix
+        )
+        
+        # 이미지 파일 확인
+        if 'Contents' not in response:
+            return False
+            
+        for obj in response['Contents']:
+            ext = os.path.splitext(obj['Key'])[1].lower()
+            if ext in image_extensions:
+                return True
+        
+        return False
+    except Exception as e:
+        print(f"Error checking S3 path: {str(e)}")
+        return False
 
 def run_training():
     # 설정 파일 로드
     config = load_config('configs/train_config.yaml')
     
-    # SageMaker 세션 설정
-    session = sagemaker.Session()
-    role = os.environ.get('SAGEMAKER_ROLE_ARN')
-    
-    # 현재 시간으로 작업 이름 생성
-    timestamp = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
-    base_job_name = f"{config['base_job_name']}-{timestamp}"
-    
-    # 데이터 입력 설정
-    if config['upload_data']:
+    try:
+        # SageMaker 세션 설정
+        session = sagemaker.Session()
+        role = os.environ.get('SAGEMAKER_ROLE_ARN')
+        
+        # S3 데이터 채널 설정
         s3_config = config['s3']
+        bucket_name = s3_config['bucket_name']
+        
+        # 각 채널의 이미지 파일 존재 확인
+        channels = {
+            'train': f"{s3_config['prefix']}/{s3_config['train_prefix']}",
+            'val': f"{s3_config['prefix']}/{s3_config['val_prefix']}",
+            'test': f"{s3_config['prefix']}/{s3_config['test_prefix']}"
+        }
+        
+        # 각 채널 확인
+        for channel_name, prefix in channels.items():
+            if not check_s3_images(session, bucket_name, prefix):
+                raise ValueError(f"No image files found in {channel_name} channel: s3://{bucket_name}/{prefix}")
+        
+        # 데이터 채널 구성
         data_channels = {
-            'train': f"s3://{s3_config['bucket_name']}/{s3_config['prefix']}/{s3_config['train_prefix']}",
-            'val': f"s3://{s3_config['bucket_name']}/{s3_config['prefix']}/{s3_config['val_prefix']}",
-            'test': f"s3://{s3_config['bucket_name']}/{s3_config['prefix']}/{s3_config['test_prefix']}"
+            name: f"s3://{bucket_name}/{prefix}"
+            for name, prefix in channels.items()
         }
-    else:
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # pneumo-ai-pipeline 디렉토리
-        data_channels = {
-            'train': os.path.join(base_dir, config['local']['data_dir'], config['local']['train_dir']),
-            'val': os.path.join(base_dir, config['local']['data_dir'], config['local']['val_dir']),
-            'test': os.path.join(base_dir, config['local']['data_dir'], config['local']['test_dir'])
-        }
-    
-    # MLflow 환경 변수 설정
-    os.environ['MLFLOW_TRACKING_URI'] = config['mlflow']['tracking_uri']
-    os.environ['MLFLOW_EXPERIMENT_NAME'] = config['mlflow']['experiment_name']
-    
-    # SageMaker PyTorch Estimator 생성
-    estimator = PyTorch(
-        entry_point=config['entry_point'],
-        source_dir=config['source_dir'],
-        role=role,
-        instance_count=config['instance_count'],
-        instance_type=config['instance_type'],
-        framework_version=config['framework_version'],
-        py_version=config['py_version'],
-        hyperparameters=config['hyperparameters'],
-        base_job_name=base_job_name,
-        sagemaker_session=session,
-        output_path=f"s3://{s3_config['bucket_name']}/{s3_config['prefix']}/output",
-        environment={
-            'MLFLOW_TRACKING_URI': config['mlflow']['tracking_uri'],
-            'MLFLOW_EXPERIMENT_NAME': config['mlflow']['experiment_name']
-        }
-    )
-    
-    # 훈련 실행
-    print("Starting training job...")
-    estimator.fit(data_channels, wait=True)
-    print("Training completed!")
-    
-    # 모델 아티팩트 경로 출력
-    print(f"Model artifacts stored at: {estimator.model_data}")
+        
+        # requirements.txt 파일 경로 설정
+        requirements_path = Path(__file__).parent.parent / 'requirements-train.txt'
+        
+        timestamp = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
+        base_job_name = f"{config['base_job_name']}-{timestamp}"
+        
+        # SageMaker PyTorch Estimator 생성
+        estimator = PyTorch(
+            entry_point=config['entry_point'],
+            source_dir=config['source_dir'],
+            role=role,
+            instance_count=config['instance_count'],
+            instance_type=config['instance_type'],
+            framework_version=config['framework_version'],
+            py_version=config['py_version'],
+            hyperparameters=config['hyperparameters'],
+            base_job_name=base_job_name,
+            sagemaker_session=session,
+            output_path=f"s3://{bucket_name}/{s3_config['prefix']}/output",
+            dependencies=[str(requirements_path)],
+            environment={
+                'MLFLOW_TRACKING_URI': config['mlflow']['tracking_uri'],
+                'MLFLOW_EXPERIMENT_NAME': config['mlflow']['experiment_name']
+            }
+        )
+        
+        # 훈련 실행
+        print("Starting training job...")
+        estimator.fit(data_channels, wait=True)
+        print("Training completed!")
+        print(f"Model artifacts stored at: {estimator.model_data}")
+        
+    except ValueError as ve:
+        print(f"Error: {str(ve)}")
+    except Exception as e:
+        print(f"Unexpected error occurred: {str(e)}")
 
 if __name__ == '__main__':
     run_training()

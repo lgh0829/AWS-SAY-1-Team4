@@ -96,10 +96,41 @@ def validate(model, val_loader, criterion, device):
     
     return val_loss / len(val_loader), 100. * correct / total
 
+def get_device():
+    """
+    사용 가능한 최적의 디바이스 선택
+    1. CUDA GPU
+    2. MPS (Apple Silicon)
+    3. CPU
+    """
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+        print(f"Using CUDA GPU: {torch.cuda.get_device_name(0)}")
+        print(f"Available GPU memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.2f} GB")
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+        print("Using Apple Silicon GPU (MPS)")
+    else:
+        device = torch.device("cpu")
+        print("Using CPU")
+    return device
+
 def main():
     args = parse_args()
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
+    
+    # 디바이스 설정
+    device = get_device()
+    
+    # CUDA 사용 시 추가 설정
+    if device.type == 'cuda':
+        # 메모리 최적화 설정
+        torch.backends.cudnn.benchmark = True
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
+        
+        # GPU 메모리 상태 출력
+        print(f"GPU Memory Allocated: {torch.cuda.memory_allocated(0)/1024**2:.2f} MB")
+        print(f"GPU Memory Cached: {torch.cuda.memory_reserved(0)/1024**2:.2f} MB")
     
     # 데이터 로더 설정
     train_transforms, data_transforms = get_transforms()
@@ -108,9 +139,21 @@ def main():
     val_dataset = datasets.ImageFolder(args.val, transform=data_transforms)
     test_dataset = datasets.ImageFolder(args.test, transform=data_transforms)
     
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=args.batch_size)
-    test_loader = DataLoader(test_dataset, batch_size=args.batch_size)
+    # 데이터 로더 설정 시 worker 수 최적화
+    num_workers = 4 if device.type == 'cuda' else 0
+    train_loader = DataLoader(train_dataset, 
+                            batch_size=args.batch_size, 
+                            shuffle=True,
+                            num_workers=num_workers,
+                            pin_memory=device.type=='cuda')
+    val_loader = DataLoader(val_dataset, 
+                          batch_size=args.batch_size,
+                          num_workers=num_workers,
+                          pin_memory=device.type=='cuda')
+    test_loader = DataLoader(test_dataset, 
+                           batch_size=args.batch_size,
+                           num_workers=num_workers,
+                           pin_memory=device.type=='cuda')
     
     # 모델 설정
     model = create_model(args.model_type, args.num_classes, device)
