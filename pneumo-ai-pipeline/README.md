@@ -53,3 +53,23 @@ my-dev-repo/
 4. 최종 전처리된 이미지를 S3에 업로드하는 코드를 추가했습니다
 5. 이전의 선택적 플래그(segmentation, S3 업로드)는 이제 필수 워크플로우 단계이므로 제거했습니다
 6. 출력 디렉토리가 확실히 존재하도록 os.makedirs()를 사용하여 디렉토리 생성을 추가했습니다
+
+## train.py
+
+SageMaker 통합:
+
+SageMaker의 환경변수를 사용하여 데이터 경로와 모델 저장 경로를 설정
+argparse를 통해 하이퍼파라미터 설정 가능
+데이터 로딩:
+
+SageMaker의 channel을 통해 전달된 데이터 경로 사용
+train, validation, test 데이터셋 각각 설정
+MLflow 통합:
+
+Tensorboard 대신 MLflow로 지표 기록
+실험 이름과 tracking URI는 환경변수에서 가져옴
+모델 아티팩트 저장 및 로깅
+하이퍼파라미터 설정:
+
+모델 타입, 에포크 수, 배치 크기, 학습률 등을 인자로 받아 설정
+early stopping patience 설정 가능

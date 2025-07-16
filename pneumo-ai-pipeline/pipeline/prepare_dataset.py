@@ -195,23 +195,25 @@ def prepare_training_data(config_path):
                 print(f"이미지 분할 중 오류 발생 ({img_path}): {str(e)}")
 
         print(f"폐 분할 완료")
-        
-        # 4. 분할된 폐 이미지를 S3에 업로드
-        if upload_to_s3 and bucket_name and s3_prefix:
-            s3 = S3Handler(bucket_name)
-            full_segmented_prefix = f"{s3_prefix}/{s3_segmented_prefix}" if s3_prefix else s3_segmented_prefix
-            print(f"분할된 이미지 S3 업로드 시작: s3://{bucket_name}/{full_segmented_prefix}")
-            uploaded_files = s3.upload_directory(segmented_dir, full_segmented_prefix)
-            print(f"분할된 폐 이미지 S3 업로드 완료: {len(uploaded_files)}개 파일")
     else:
         print("폐 분할 단계 건너뛰기")
+        
+    # 4. 분할된 폐 이미지를 S3에 업로드
+    if upload_to_s3 and bucket_name and s3_prefix and s3_segmented_prefix:
+        s3 = S3Handler(bucket_name)
+        full_segmented_prefix = f"{s3_prefix}/{s3_segmented_prefix}"
+        print(f"분할된 이미지 S3 업로드 시작: s3://{bucket_name}/{full_segmented_prefix}")
+        uploaded_files = s3.upload_directory(segmented_dir, full_segmented_prefix)
+        print(f"분할된 폐 이미지 S3 업로드 완료: {len(uploaded_files)}개 파일")
+    else:
+        print("폐 분할 업로드 단계 건너뛰기")
 
     # 5. 이미지 전처리 적용 (설정에 따라 실행)
     if preprocess_images:
         preprocessor = ImagePreprocessor(config.get('preprocessing'))
         
         # 전처리할 이미지 경로 수집
-        source_dir = os.path.join(data_dir, segmented_dir) if segment_lungs else data_dir
+        source_dir = os.path.join(segmented_dir) if segment_lungs else data_dir
         preprocessed_paths = []
         for root, _, files in os.walk(source_dir):
             for file in files:
@@ -247,16 +249,18 @@ def prepare_training_data(config_path):
                 print(f"이미지 전처리 중 오류 발생 ({img_path}): {str(e)}")
 
         print(f"전처리 완료")
-        
-        # 6. 전처리된 이미지를 S3에 업로드
-        if upload_to_s3 and bucket_name and s3_prefix:
-            s3 = S3Handler(bucket_name)
-            full_preprocessed_prefix = f"{s3_prefix}/{s3_preprocessed_prefix}" if s3_prefix else s3_preprocessed_prefix
-            print(f"전처리된 이미지 S3 업로드 시작: s3://{bucket_name}/{full_preprocessed_prefix}")
-            uploaded_files = s3.upload_directory(preprocessed_dir, full_preprocessed_prefix)
-            print(f"전처리된 이미지 S3 업로드 완료: {len(uploaded_files)}개 파일")
     else:
         print("이미지 전처리 단계 건너뛰기")
+        
+    # 6. 전처리된 이미지를 S3에 업로드
+    if upload_to_s3 and bucket_name and s3_prefix:
+        s3 = S3Handler(bucket_name)
+        full_preprocessed_prefix = f"{s3_prefix}/{s3_preprocessed_prefix}" if s3_prefix else s3_preprocessed_prefix
+        print(f"전처리된 이미지 S3 업로드 시작: s3://{bucket_name}/{full_preprocessed_prefix}")
+        uploaded_files = s3.upload_directory(preprocessed_dir, full_preprocessed_prefix)
+        print(f"전처리된 이미지 S3 업로드 완료: {len(uploaded_files)}개 파일")
+    else:
+        print("전처리된 이미지 업로드 단계 건너뛰기")
     
     print(f"데이터셋 준비 완료")
     return preprocessed_dir
