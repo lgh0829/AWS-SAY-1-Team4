@@ -130,7 +130,15 @@ def run_training():
         timestamp = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
         base_job_name = f"{config['base_job_name']}-{timestamp}"
         
-        # SageMaker PyTorch Estimator 생성
+        # MLflow 환경 변수 설정
+        environment = {}
+        if config.get('mlflow') and config['mlflow'].get('tracking_uri'):
+            environment.update({
+                'MLFLOW_TRACKING_URI': config['mlflow']['tracking_uri'],
+                'MLFLOW_EXPERIMENT_NAME': config['mlflow'].get('experiment_name', 'default')
+            })
+        
+        # Estimator 생성
         estimator = PyTorch(
             entry_point=config['entry_point'],
             source_dir=config['source_dir'],
@@ -144,17 +152,8 @@ def run_training():
             sagemaker_session=session,
             output_path=f"s3://{bucket_name}/{s3_config['prefix']}/output",
             requirements_file=str(requirements_path),
-            # dependencies=[str(requirements_path)],
-            environment={
-                'MLFLOW_TRACKING_URI': config['mlflow']['tracking_uri'],
-                'MLFLOW_EXPERIMENT_NAME': config['mlflow']['experiment_name']
-            },
-            tags=[
-                {
-                    'Key': 'project',
-                    'Value': 'pre-4team'
-                },
-            ]
+            environment=environment,
+            tags=[{'Key': 'project', 'Value': 'pre-4team'}]
         )
         
         # 훈련 실행

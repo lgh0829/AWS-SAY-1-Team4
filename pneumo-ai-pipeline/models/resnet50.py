@@ -165,54 +165,61 @@ def main():
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', 
                                                     factor=0.1, patience=3)
     
-    # MLflow 실험 시작
-    with mlflow.start_run():
+    # MLflow 사용 여부 확인
+    use_mlflow = bool(os.environ.get('MLFLOW_TRACKING_URI')) and bool(os.environ.get('MLFLOW_EXPERIMENT_NAME'))
+    
+    if use_mlflow:
+        mlflow.start_run()
         mlflow.log_params(vars(args))
+    
+    best_val_acc = 0.0
+    patience_counter = 0
+    
+    for epoch in range(args.epochs):
+        # 훈련
+        train_loss, train_acc = train_epoch(model, train_loader, criterion, optimizer, device)
         
-        best_val_acc = 0.0
-        patience_counter = 0
+        # 검증
+        val_loss, val_acc = validate(model, val_loader, criterion, device)
         
-        for epoch in range(args.epochs):
-            # 훈련
-            train_loss, train_acc = train_epoch(model, train_loader, 
-                                              criterion, optimizer, device)
-            
-            # 검증
-            val_loss, val_acc = validate(model, val_loader, criterion, device)
-            
-            # 로그 기록
+        # MLflow 로그 기록
+        if use_mlflow:
             mlflow.log_metrics({
                 'train_loss': train_loss,
                 'train_accuracy': train_acc,
                 'val_loss': val_loss,
                 'val_accuracy': val_acc
             }, step=epoch)
-            
-            print(f"Epoch {epoch+1}/{args.epochs}")
-            print(f"Train Loss: {train_loss:.4f}, Acc: {train_acc:.2f}%")
-            print(f"Val Loss: {val_loss:.4f}, Acc: {val_acc:.2f}%")
-            
-            # Early Stopping 체크
-            if val_acc > best_val_acc:
-                best_val_acc = val_acc
-                patience_counter = 0
-                # 모델 저장
-                model_path = os.path.join(args.model_dir, 'model.pth')
-                torch.save(model.state_dict(), model_path)
-                mlflow.log_artifact(model_path)
-            else:
-                patience_counter += 1
-                if patience_counter >= args.patience:
-                    print(f"Early stopping at epoch {epoch+1}")
-                    break
-            
-            scheduler.step(val_acc)
         
-        # 최종 테스트
-        test_loss, test_acc = validate(model, test_loader, criterion, device)
-        print(f"Final Test Accuracy: {test_acc:.2f}%")
+        print(f"Epoch {epoch+1}/{args.epochs}")
+        print(f"Train Loss: {train_loss:.4f}, Acc: {train_acc:.2f}%")
+        print(f"Val Loss: {val_loss:.4f}, Acc: {val_acc:.2f}%")
+        
+        # Early Stopping 체크
+        if val_acc > best_val_acc:
+            best_val_acc = val_acc
+            patience_counter = 0
+            # 모델 저장
+            model_path = os.path.join(args.model_dir, 'model.pth')
+            torch.save(model.state_dict(), model_path)
+            if use_mlflow:
+                mlflow.log_artifact(model_path)
+        else:
+            patience_counter += 1
+            if patience_counter >= args.patience:
+                print(f"Early stopping at epoch {epoch+1}")
+                break
+        
+        scheduler.step(val_acc)
+    
+    # 최종 테스트
+    test_loss, test_acc = validate(model, test_loader, criterion, device)
+    print(f"Final Test Accuracy: {test_acc:.2f}%")
+    
+    if use_mlflow:
         mlflow.log_metric('test_accuracy', test_acc)
         mlflow.pytorch.log_model(model, artifact_path="model")
+        mlflow.end_run()
 
 if __name__ == '__main__':
     main()
