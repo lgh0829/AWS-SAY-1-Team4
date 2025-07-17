@@ -151,6 +151,7 @@ def run_training():
             base_job_name=base_job_name,
             sagemaker_session=session,
             output_path=f"s3://{bucket_name}/{s3_config['prefix']}/output",
+            code_location=f"s3://{bucket_name}/{s3_config['prefix']}/code",
             requirements_file=str(requirements_path),
             environment=environment,
             tags=[{'Key': 'project', 'Value': 'pre-4team'}]
