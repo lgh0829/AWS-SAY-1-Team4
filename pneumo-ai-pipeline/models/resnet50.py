@@ -7,6 +7,7 @@ from torchvision import datasets, transforms, models
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import mlflow
+import mlflow.pytorch
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -211,6 +212,7 @@ def main():
         test_loss, test_acc = validate(model, test_loader, criterion, device)
         print(f"Final Test Accuracy: {test_acc:.2f}%")
         mlflow.log_metric('test_accuracy', test_acc)
+        mlflow.pytorch.log_model(model, artifact_path="model")
 
 if __name__ == '__main__':
     main()

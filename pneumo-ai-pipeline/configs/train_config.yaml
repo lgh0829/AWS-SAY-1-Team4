@@ -3,14 +3,14 @@ entry_point: "resnet50.py"
 source_dir: "models"
 instance_count: 1
 instance_type: "ml.g4dn.xlarge"  # GPU 인스턴스
-framework_version: "1.12.0"  # PyTorch 버전
-py_version: "py38"  # Python 버전
+framework_version: "1.13.1"  # 안정적인 PyTorch 버전
+py_version: "py39"    # Python 3.9로 다운그레이드
 base_job_name: "aws-say1-4team"  # SageMaker 작업 이름
 
 # 데이터 설정
 s3:
   bucket_name: "${S3_BUCKET_NAME}"  # S3 버킷 이름
-  prefix: "cxr-pneumonia-3"
+  prefix: "cxr-pneumonia-2"
   train_prefix: "preprocessed/train"
   val_prefix: "preprocessed/val"
   test_prefix: "preprocessed/test"
@@ -28,8 +28,8 @@ mlflow:
 # 하이퍼파라미터
 hyperparameters:
   epochs: 30
-  batch_size: 32
-  learning_rate: 0.0001
-  model_type: "resnet50"
-  num_classes: 3
+  batch-size: 32
+  learning-rate: 0.0001
+  model-type: "resnet50"
+  num-classes: 3
   patience: 5

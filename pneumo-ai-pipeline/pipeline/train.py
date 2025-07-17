@@ -120,7 +120,12 @@ def run_training():
         }
         
         # requirements.txt 파일 경로 설정
-        requirements_path = Path(__file__).parent.parent / 'requirements-train.txt'
+        requirements_path = Path(__file__).parent.parent / config['source_dir'] / 'requirements.txt'
+
+        if not requirements_path.exists():
+            raise FileNotFoundError(f"Requirements 파일을 찾을 수 없습니다: {requirements_path}")
+        
+        print(f"사용할 requirements 파일: {requirements_path}")
         
         timestamp = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
         base_job_name = f"{config['base_job_name']}-{timestamp}"
@@ -138,12 +143,12 @@ def run_training():
             base_job_name=base_job_name,
             sagemaker_session=session,
             output_path=f"s3://{bucket_name}/{s3_config['prefix']}/output",
-            dependencies=[str(requirements_path)],
+            requirements_file=str(requirements_path),
+            # dependencies=[str(requirements_path)],
             environment={
                 'MLFLOW_TRACKING_URI': config['mlflow']['tracking_uri'],
                 'MLFLOW_EXPERIMENT_NAME': config['mlflow']['experiment_name']
             },
-            
             tags=[
                 {
                     'Key': 'project',
