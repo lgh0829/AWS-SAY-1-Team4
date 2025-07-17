@@ -8,7 +8,7 @@ steps:
 # S3 설정
 s3:
   bucket_name: "${S3_BUCKET_NAME}"  # S3 버킷 이름
-  prefix: "cxr-pneumonia-2"
+  prefix: "cxr-pneumonia-3"
   input_prefix: "raw"
   segmented_prefix: "segmented"
   preprocessed_prefix: "preprocessed"
@@ -28,7 +28,7 @@ preprocessing:
     apply_clahe: True
     apply_gaussian_blur: True
     apply_min_max_stretch: True
-    apply_sharpening: True
+    apply_sharpening: False
     convert_to_rgb: True
   
   # 전처리 파라미터
@@ -37,7 +37,7 @@ preprocessing:
       clip_limit: 2.0
       grid_size: [8, 8]
     gaussian_blur:
-      radius: 1.0
+      radius: 0.2
     min_max_stretch:
       lower_percentile: 1
       upper_percentile: 99

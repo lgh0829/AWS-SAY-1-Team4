@@ -142,7 +142,14 @@ def run_training():
             environment={
                 'MLFLOW_TRACKING_URI': config['mlflow']['tracking_uri'],
                 'MLFLOW_EXPERIMENT_NAME': config['mlflow']['experiment_name']
-            }
+            },
+            
+            tags=[
+                {
+                    'Key': 'project',
+                    'Value': 'pre-4team'
+                },
+            ]
         )
         
         # 훈련 실행

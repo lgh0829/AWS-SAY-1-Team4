@@ -43,13 +43,12 @@ def get_transforms():
         transforms.Normalize([0.485, 0.456, 0.406],
                              [0.229, 0.224, 0.225])
 ])
-
     
     return train_transforms, data_transforms
 
 def create_model(model_type, num_classes, device):
-    if model_type == 'resnet50':
-        model = models.resnet50(weights='IMAGENET1K_V1')
+    if model_type == 'resnet34':
+        model = models.resnet34(weights='IMAGENET1K_V1')
         model.fc = nn.Linear(model.fc.in_features, num_classes)
     return model.to(device)
 
