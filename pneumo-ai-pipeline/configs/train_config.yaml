@@ -10,7 +10,7 @@ base_job_name: "aws-say1-4team"  # SageMaker 작업 이름
 # 데이터 설정
 s3:
   bucket_name: "${S3_BUCKET_NAME}"  # S3 버킷 이름
-  prefix: "cxr-pneumonia-2"
+  prefix: "cxr-pneumonia-3"
   train_prefix: "preprocessed/train"
   val_prefix: "preprocessed/val"
   test_prefix: "preprocessed/test"
@@ -20,18 +20,16 @@ local:
   val_dir: "val"
   test_dir: "test"
 
-# MLflow를 사용하지 않을 경우
+# MLflow 설정
 mlflow: null
-# # MLflow를 사용할 경우
-# mlflow:
-#   tracking_uri: "http://your-mlflow-server:5000"
-#   experiment_name: "pneumoniaClassification"
+  #tracking_uri: "http://your-mlflow-server:5000"
+ # experiment_name: "pneumoniaClassification"
 
 # 하이퍼파라미터
 hyperparameters:
   epochs: 30
   batch-size: 32
   learning-rate: 0.0001
-  model-type: "resnet50"
+  model-type: "resnet50"  
   num-classes: 3
   patience: 5

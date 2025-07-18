@@ -19,3 +19,9 @@ sagemaker>=2.248.1  # SageMaker SDK
 tqdm==4.67.1
 PyYAML==6.0.2
 python-dotenv==1.1.1
+
+# Additional dependencies
+torchxrayvision==1.2.1
+
+transformers==4.40.0
+

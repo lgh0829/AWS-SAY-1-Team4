@@ -4,6 +4,7 @@ from common.pneumo_utils.preprocessing import ImagePreprocessor
 import torch
 import torch.nn as nn
 from torchvision import models, transforms
+import torchxrayvision as xrv
 
 class ChestXrayPredictor:
     def __init__(self, model_path, device=None):
@@ -37,6 +38,7 @@ class ChestXrayPredictor:
         model.fc = nn.Linear(model.fc.in_features, 3)  # 3-class classification
         model.load_state_dict(torch.load(model_path, map_location=self.device))
         return model
+        
     
     def predict(self, image_path):
         """이미지 경로에서 예측 수행"""

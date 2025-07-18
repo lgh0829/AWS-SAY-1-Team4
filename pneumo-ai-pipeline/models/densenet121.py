@@ -31,15 +31,16 @@ def parse_args():
 
 def get_transforms():
     data_transforms = transforms.Compose([
-        transforms.Grayscale(num_output_channels=1),
-        transforms.Resize((512, 512)),
+        transforms.Grayscale(num_output_channels=1),  # ✅ 핵심
+        transforms.Resize((224, 224)),
         transforms.ToTensor(),
         transforms.Normalize([0.5], [0.5])
-    ])
+])
 
+    
     train_transforms = transforms.Compose([
-        transforms.Grayscale(num_output_channels=1),  
-        transforms.Resize((512, 512)),
+        transforms.Grayscale(num_output_channels=1),  # ✅ 핵심
+        transforms.Resize((224, 224)),
         transforms.RandomRotation(15),
         transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
         transforms.ColorJitter(brightness=0.15, contrast=0.2),
@@ -47,37 +48,40 @@ def get_transforms():
         transforms.Normalize([0.5], [0.5])  # ✅ 1채널 정규화
 ])
 
-
     
     return train_transforms, data_transforms
 
 def create_model(model_type, num_classes, device):
-    if model_type == "resnet50":
+    if model_type == 'densenet121':
         import torchxrayvision as xrv
+        import os
         import torch.nn as nn
+        import torch
 
-        # ✅ torchxrayvision에서 ResNet50 불러오기
-        model = xrv.models.ResNet(weights="resnet50-res512-all")
+        # ✅ 사전학습 weight 수동 다운로드
+        model_dir = "/root/.torchxrayvision/models_data"
+        os.makedirs(model_dir, exist_ok=True)
 
-        # ✅ classifier 수정 (주의: .model.fc)
-        in_features = model.model.fc.in_features
-        model.model.fc = nn.Linear(in_features, num_classes)
-        
-        model.op_threshs = None
+        model_path = os.path.join(
+            model_dir,
+            "nih-pc-chex-mimic_ch-google-openi-kaggle-densenet121-d121-tw-lr001-rot45-tr15-sc15-seed0-best.pt"
+        )
 
-        # ✅ 추가 정보
+        if not os.path.exists(model_path):
+            os.system(f"wget https://github.com/mlmed/torchxrayvision/releases/download/v1/nih-pc-chex-mimic_ch-google-openi-kaggle-densenet121-d121-tw-lr001-rot45-tr15-sc15-seed0-best.pt -O {model_path}")
+
+
+        model = torch.load(model_path, map_location=device)  # ✅ 그냥 모델 자체를 불러와!
+
+        # ✅ 3. classifier 수정
+        in_features = model.classifier.in_features
+        model.classifier = nn.Linear(in_features, num_classes)
         model.n_outputs = num_classes
         model.pathologies = [f"class_{i}" for i in range(num_classes)]
 
         return model.to(device)
-
     else:
         raise ValueError("지원하지 않는 모델 타입입니다.")
-    
-# if model_type == 'resnet50':
-    #     model = models.resnet50(weights='IMAGENET1K_V1')
-    #     model.fc = nn.Linear(model.fc.in_features, num_classes)
-    # return model.to(device)
 
 def train_epoch(model, train_loader, criterion, optimizer, device):
     model.train()
