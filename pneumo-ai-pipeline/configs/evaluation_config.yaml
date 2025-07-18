@@ -1,0 +1,19 @@
+# 데이터 설정
+s3:
+  bucket_name: "${S3_BUCKET_NAME}"  # S3 버킷 이름
+  prefix: "cxr-pneumonia-3"
+  job_name: "aws-say1-4team-2025-07-17-15-40-36-2025-07-17-06-40-36-070"
+local:
+  data: 
+    data_dir: "data"  # 로컬 데이터 디렉토리
+    test_dir: "test"  # 로컬 테스트 데이터 디렉토리
+  result_dir: "results"  # 로컬 성능지표 저장 디렉토리
+  output:
+    visualization_path: "plot.png"
+    metrics_path: "metrics.json"
+
+# 모델 정보
+model:
+  type: "resnet50"  # 모델 이름
+  num_classes: 3    # 클래스 수
+  pretrained_weight: "IMAGENET1K_V1"  # 사전 훈련된 모델 사용 여부

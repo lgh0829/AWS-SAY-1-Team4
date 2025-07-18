@@ -1,58 +1,29 @@
 # ML Pipeline 구조
 
 ```
-my-dev-repo/
-├── common/                          # 공통 라이브러리 폴더
-│   ├── lung_utils/                  # 폐 관련 유틸리티 패키지
-│   │   ├── __init__.py
-│   │   ├── segmentation.py          # 폐 영역 분할 기능
-│   │   ├── preprocessing.py         # 이미지 전처리 기능(CLAHE, blur 등)
-│   │   ├── data_handling.py         # 데이터 로딩/저장/변환 기능
-│   │   └── visualization.py         # 결과 시각화 도구
-│   │
-│   └── cloud_utils/                 # 클라우드 관련 유틸리티
-│       ├── __init__.py
-│       ├── s3_handler.py            # S3 연동 기능
-│       └── sagemaker_utils.py       # SageMaker 연동 기능
-│
-├── training/                        # 학습 관련 코드
-│   ├── scripts/                     # 실행 스크립트
-│   │   ├── prepare_dataset.py       # 데이터셋 준비
-│   │   ├── sagemaker_train.py       # SageMaker 학습 실행
-│   │   └── mlflow_logger.py         # MLflow 연동
-│   │
-│   └── src/                         # 소스 코드
-│       ├── train.py                 # 모델 훈련 코드
-│       ├── evaluate.py              # 모델 평가 코드
-│       └── data_loader.py           # 데이터 로더
-│
-├── inference/                       # 추론 관련 코드
-│   ├── scripts/                     # 실행 스크립트
-│   │   ├── deploy_model.py          # 모델 배포
-│   │   └── batch_inference.py       # 배치 추론
-│   │
-│   └── src/                         # 소스 코드
-│       ├── predict.py               # 개별 예측 로직
-│       └── postprocessing.py        # 예측 후처리
-│
-├── configs/                         # 설정 파일
-│   ├── config.yaml                  # 기본 설정
-│   ├── train_config.yaml            # 훈련 관련 설정
-│   └── inference_config.yaml        # 추론 관련 설정
-│
-├── requirements.txt                 # 프로젝트 의존성
-└── setup.py                         # 패키지 설치용
+penumo-ai-pipeline
+├── common  # 공통 라이브러리
+├── configs # 설정 파일
+│   ├── inference_config.yaml
+│   ├── prepare_config.yaml
+│   └── train_config.yaml
+├── models  # sagamaker training-job 입력 파일
+│   ├── requirements.txt
+│   ├── resnet34.py
+│   └── resnet50.py
+├── pipeline # 파이프라인 파일
+│   ├── inference.py
+│   ├── prepare_dataset.py
+│   └── train.py
+├── requirements-prepare.txt # 데이터셋 준비용 가상환경 의존성 관리
+└── requirements-train.txt   # 훈련 시작용 가상환경 의존성 관리
 ```
-
 
 ## prepare_dataset.py
 
-1. 작업 순서를 변경하여 원본 이미지에 폐 분할을 먼저 적용하도록 했습니다
-2. 분할된 폐 이미지를 S3에 업로드하는 코드를 추가했습니다
-3. 전처리는 원본 이미지가 아닌 분할된 이미지에 적용하도록 변경했습니다
-4. 최종 전처리된 이미지를 S3에 업로드하는 코드를 추가했습니다
-5. 이전의 선택적 플래그(segmentation, S3 업로드)는 이제 필수 워크플로우 단계이므로 제거했습니다
-6. 출력 디렉토리가 확실히 존재하도록 os.makedirs()를 사용하여 디렉토리 생성을 추가했습니다
+1. 원본 이미지에 폐 분할 적용
+2. 분할된 이미지에 전처리 적용
+3. 폐 분할, 전처리 이미지 S3 업로드
 
 ## train.py
 
@@ -73,3 +44,32 @@ Tensorboard 대신 MLflow로 지표 기록
 
 모델 타입, 에포크 수, 배치 크기, 학습률 등을 인자로 받아 설정
 early stopping patience 설정 가능
+
+# 성능 평가 지표
+
+## 일반
+
+|지표|설명|
+|---|---|
+|Accuracy (정확도)|전체 중 맞게 예측한 비율|
+|Precision (정밀도)|Positive 예측 중 실제 Positive인 비율 = TP / (TP + FP)|
+|Recall (재현율, 민감도)|실제 Positive 중 모델이 Positive라고 예측한 비율 = TP / (TP + FN)|
+|F1 Score|정밀도와 재현율의 조화 평균 = 2 × (Precision × Recall) / (Precision + Recall)|
+|ROC-AUC|분류 임계값 변화에 따른 TPR vs FPR 곡선 아래 면적|
+|PR-AUC|Precision vs Recall 곡선 아래 면적 (불균형 데이터에서 유용)|
+|Specificity (특이도)|실제 Negative 중 Negative로 예측한 비율 = TN / (TN + FP)|
+
+## Multi-Class Classification
+
+|지표|설명|
+|---|---|
+|Macro F1 / Micro F1|클래스별 F1 평균 (Macro: 클래스별 평균 / Micro: 전체 평균)|
+|Confusion Matrix|각 클래스 간 예측 결과를 행렬로 나타냄|
+|Top-k Accuracy|정답이 상위 k개의 예측 결과 중 하나에 포함되는 비율|
+
+## 의료/헬스케어 특화 지표
+|지표|설명|
+|---|---|
+|Youden’s Index|TPR + TNR - 1 (임계값 선택에 사용)|
+|Balanced Accuracy|(Sensitivity + Specificity) / 2|
+|Dice Coefficient|주로 segmentation 모델에서 예측 mask와 정답 mask의 유사도 (IoU와 유사)|
