@@ -29,7 +29,7 @@ preprocessing:
     apply_gaussian_blur: True
     apply_min_max_stretch: True
     apply_sharpening: False
-    convert_to_rgb: False
+    convert_to_rgb: True 
   
   # 전처리 파라미터
   params:

@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 import mlflow
 import mlflow.pytorch
-from transformers import AutoModelForImageClassification
+import torchxrayvision as xrv
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -32,18 +32,20 @@ def parse_args():
 def get_transforms():
     data_transforms = transforms.Compose([
         transforms.Resize((224, 224)),
+        transforms.Grayscale(num_output_channels=1),
         transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        transforms.Normalize([0.5], [0.5])
     ])
     
     train_transforms = transforms.Compose([
         transforms.Resize((224, 224)),
+        transforms.Grayscale(num_output_channels=1),
         transforms.RandomRotation(15),
         transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
         transforms.ColorJitter(brightness=0.15, contrast=0.2),
         transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406],
-                             [0.229, 0.224, 0.225])
+        transforms.Normalize([0.5],
+                             [0.5])
 ])
 
 
@@ -52,12 +54,24 @@ def get_transforms():
 
 def create_model(model_type, num_classes, device):
     if model_type == "resnet50":
-        model = AutoModelForImageClassification.from_pretrained(
-            "microsoft/resnet-50",
-            num_labels=num_classes,
-            ignore_mismatched_sizes=True  # 마지막 layer 바꿔주는 옵션
-        )
+        import torchxrayvision as xrv
+        import torch.nn as nn
+
+        # ✅ torchxrayvision에서 ResNet50 불러오기
+        model = xrv.models.ResNet(weights="resnet50-res512-all")
+
+        # ✅ classifier 수정 (주의: .model.fc)
+        in_features = model.model.fc.in_features
+        model.model.fc = nn.Linear(in_features, num_classes)
+        
+        model.op_threshs = None
+
+        # ✅ 추가 정보
+        model.n_outputs = num_classes
+        model.pathologies = [f"class_{i}" for i in range(num_classes)]
+
         return model.to(device)
+
     else:
         raise ValueError("지원하지 않는 모델 타입입니다.")
 # if model_type == 'resnet50':
@@ -76,7 +90,7 @@ def train_epoch(model, train_loader, criterion, optimizer, device):
             images, labels = images.to(device), labels.to(device)
             
             optimizer.zero_grad()
-            outputs = model(images).logits
+            outputs = model(images)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
@@ -100,7 +114,7 @@ def validate(model, val_loader, criterion, device):
     with torch.no_grad():
         for images, labels in val_loader:
             images, labels = images.to(device), labels.to(device)
-            outputs = model(images).logits
+            outputs = model(images)
             loss = criterion(outputs, labels)
             
             val_loss += loss.item()

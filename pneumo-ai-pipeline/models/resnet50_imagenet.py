@@ -3,12 +3,10 @@ import argparse
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torchvision import datasets, transforms , models
+from torchvision import datasets, transforms, models
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import mlflow
-import mlflow.pytorch
-from transformers import AutoModelForImageClassification
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -45,25 +43,14 @@ def get_transforms():
         transforms.Normalize([0.485, 0.456, 0.406],
                              [0.229, 0.224, 0.225])
 ])
-
-
     
     return train_transforms, data_transforms
 
 def create_model(model_type, num_classes, device):
-    if model_type == "resnet50":
-        model = AutoModelForImageClassification.from_pretrained(
-            "microsoft/resnet-50",
-            num_labels=num_classes,
-            ignore_mismatched_sizes=True  # 마지막 layer 바꿔주는 옵션
-        )
-        return model.to(device)
-    else:
-        raise ValueError("지원하지 않는 모델 타입입니다.")
-# if model_type == 'resnet50':
-    #     model = models.resnet50(weights='IMAGENET1K_V1')
-    #     model.fc = nn.Linear(model.fc.in_features, num_classes)
-    # return model.to(device)
+    if model_type == 'resnet50':
+        model = models.resnet50(weights='IMAGENET1K_V1')
+        model.fc = nn.Linear(model.fc.in_features, num_classes)
+    return model.to(device)
 
 def train_epoch(model, train_loader, criterion, optimizer, device):
     model.train()
@@ -76,7 +63,7 @@ def train_epoch(model, train_loader, criterion, optimizer, device):
             images, labels = images.to(device), labels.to(device)
             
             optimizer.zero_grad()
-            outputs = model(images).logits
+            outputs = model(images)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
@@ -100,7 +87,7 @@ def validate(model, val_loader, criterion, device):
     with torch.no_grad():
         for images, labels in val_loader:
             images, labels = images.to(device), labels.to(device)
-            outputs = model(images).logits
+            outputs = model(images)
             loss = criterion(outputs, labels)
             
             val_loss += loss.item()
@@ -176,61 +163,53 @@ def main():
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', 
                                                     factor=0.1, patience=3)
     
-    # MLflow 사용 여부 확인
-    use_mlflow = bool(os.environ.get('MLFLOW_TRACKING_URI')) and bool(os.environ.get('MLFLOW_EXPERIMENT_NAME'))
-    
-    if use_mlflow:
-        mlflow.start_run()
+    # MLflow 실험 시작
+    with mlflow.start_run():
         mlflow.log_params(vars(args))
-    
-    best_val_acc = 0.0
-    patience_counter = 0
-    
-    for epoch in range(args.epochs):
-        # 훈련
-        train_loss, train_acc = train_epoch(model, train_loader, criterion, optimizer, device)
         
-        # 검증
-        val_loss, val_acc = validate(model, val_loader, criterion, device)
+        best_val_acc = 0.0
+        patience_counter = 0
         
-        # MLflow 로그 기록
-        if use_mlflow:
+        for epoch in range(args.epochs):
+            # 훈련
+            train_loss, train_acc = train_epoch(model, train_loader, 
+                                              criterion, optimizer, device)
+            
+            # 검증
+            val_loss, val_acc = validate(model, val_loader, criterion, device)
+            
+            # 로그 기록
             mlflow.log_metrics({
                 'train_loss': train_loss,
                 'train_accuracy': train_acc,
                 'val_loss': val_loss,
                 'val_accuracy': val_acc
             }, step=epoch)
-        
-        print(f"Epoch {epoch+1}/{args.epochs}")
-        print(f"Train Loss: {train_loss:.4f}, Acc: {train_acc:.2f}%")
-        print(f"Val Loss: {val_loss:.4f}, Acc: {val_acc:.2f}%")
-        
-        # Early Stopping 체크
-        if val_acc > best_val_acc:
-            best_val_acc = val_acc
-            patience_counter = 0
-            # 모델 저장
-            model_path = os.path.join(args.model_dir, 'model.pth')
-            torch.save(model.state_dict(), model_path)
-            if use_mlflow:
+            
+            print(f"Epoch {epoch+1}/{args.epochs}")
+            print(f"Train Loss: {train_loss:.4f}, Acc: {train_acc:.2f}%")
+            print(f"Val Loss: {val_loss:.4f}, Acc: {val_acc:.2f}%")
+            
+            # Early Stopping 체크
+            if val_acc > best_val_acc:
+                best_val_acc = val_acc
+                patience_counter = 0
+                # 모델 저장
+                model_path = os.path.join(args.model_dir, 'model.pth')
+                torch.save(model.state_dict(), model_path)
                 mlflow.log_artifact(model_path)
-        else:
-            patience_counter += 1
-            if patience_counter >= args.patience:
-                print(f"Early stopping at epoch {epoch+1}")
-                break
+            else:
+                patience_counter += 1
+                if patience_counter >= args.patience:
+                    print(f"Early stopping at epoch {epoch+1}")
+                    break
+            
+            scheduler.step(val_acc)
         
-        scheduler.step(val_acc)
-    
-    # 최종 테스트
-    test_loss, test_acc = validate(model, test_loader, criterion, device)
-    print(f"Final Test Accuracy: {test_acc:.2f}%")
-    
-    if use_mlflow:
+        # 최종 테스트
+        test_loss, test_acc = validate(model, test_loader, criterion, device)
+        print(f"Final Test Accuracy: {test_acc:.2f}%")
         mlflow.log_metric('test_accuracy', test_acc)
-        mlflow.pytorch.log_model(model, artifact_path="model")
-        mlflow.end_run()
 
 if __name__ == '__main__':
     main()
