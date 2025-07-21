@@ -15,6 +15,7 @@ import re
 import tarfile
 import torchvision.models as models
 from torchvision import datasets, transforms
+import json
 
 # 현재 파일의 상위 디렉토리(프로젝트 루트)로 경로 설정
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -78,13 +79,14 @@ def get_device():
         print("Using CPU")
     return device
 
-def load_model(model_type,num_classes, bucket_name, model_path, results_dir, device):
+def load_model(model_type,num_classes, bucket_name, model_path, results_dir, device, weights=None):
     """
     S3에서 모델 가중치 로드 및 다운로드
     :param bucket_name: S3 버킷 이름
     :param model_path: S3 모델 경로
     :param results_dir: 로컬 결과 디렉토리
     :param device: torch 디바이스
+    :param weights: 사전학습 가중치 옵션
     """
     
     # 디렉토리 생성
@@ -100,7 +102,7 @@ def load_model(model_type,num_classes, bucket_name, model_path, results_dir, dev
         tar.extractall(path=results_dir)
 
     # 모델 로드
-    model = get_model(model_type, num_classes)
+    model = get_model(model_type, num_classes, weights)
 
     # state_dict 불러오기
     local_dict_path = results_dir / 'model.pth'
@@ -193,41 +195,99 @@ class ModelRegistry:
     """모델 레지스트리 클래스"""
     
     @staticmethod
-    def get_resnet50(num_classes):
-        model = models.resnet50(weights=None)
+    def get_resnet34(num_classes, weights=None):
+        model = models.resnet34(weights=None)
         model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
         return model
     
     @staticmethod
-    def get_resnet18(num_classes):
+    def get_resnet50(num_classes, weights=None):
+        if weights == "xrv":
+            import torchxrayvision as xrv
+            model = xrv.models.ResNet(weights="resnet50-res512-all")
+            in_features = model.model.fc.in_features
+            model.model.fc = torch.nn.Linear(in_features, num_classes)
+            model.n_outputs = num_classes
+        else:
+            model = models.resnet50(weights=None)
+            model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
+        return model
+    
+    @staticmethod
+    def get_resnet18(num_classes, weights=None):
         model = models.resnet18(weights=None)
         model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
         return model
         
     @staticmethod
-    def get_efficientnet_b0(num_classes):
+    def get_efficientnet_b0(num_classes, weights=None):
         model = models.efficientnet_b0(weights=None)
         model.classifier[1] = torch.nn.Linear(model.classifier[1].in_features, num_classes)
         return model
     
     @staticmethod
-    def get_mobilenet_v2(num_classes):
+    def get_mobilenet_v2(num_classes, weights=None):
         model = models.mobilenet_v2(weights=None)
         model.classifier[1] = torch.nn.Linear(model.classifier[1].in_features, num_classes)
         return model
+    
+    @staticmethod
+    def get_densenet121(num_classes, weights=None):
+        """
+        weights:
+            - "xrv": torchxrayvision pretrained weight 사용
+            - None: torchvision 기본 모델 사용
+        """
+        if weights == "xrv":
+            import torchxrayvision as xrv
+            import os
+            import urllib.request
 
-def get_model(model_type: str, num_classes: int):
+            # torchxrayvision 모델 다운로드 및 로딩
+            model_dir = os.path.expanduser("~/.torchxrayvision/models_data")
+            os.makedirs(model_dir, exist_ok=True)
+
+            model_path = os.path.join(
+                model_dir,
+                "nih-pc-chex-mimic_ch-google-openi-kaggle-densenet121-d121-tw-lr001-rot45-tr15-sc15-seed0-best.pt"
+            )
+
+            if not os.path.exists(model_path):
+                print(f"모델 파일 다운로드 중: {model_path}")
+                url = "https://github.com/mlmed/torchxrayvision/releases/download/v1/nih-pc-chex-mimic_ch-google-openi-kaggle-densenet121-d121-tw-lr001-rot45-tr15-sc15-seed0-best.pt"
+                urllib.request.urlretrieve(url, model_path)
+
+            model = torch.load(model_path, map_location="cpu", weights_only=False)
+
+            # classifier 교체
+            in_features = model.classifier.in_features
+            model.classifier = torch.nn.Linear(in_features, num_classes)
+            model.n_outputs = num_classes
+            return model
+        
+        else:
+            # torchvision 기본 densenet121 사용
+            from torchvision import models
+            model = models.densenet121(weights=None)
+            in_features = model.classifier.in_features
+            model.classifier = torch.nn.Linear(in_features, num_classes)
+            return model
+
+def get_model(model_type: str, num_classes: int, weights: str = None):
     """
     모델 타입에 따라 해당하는 모델을 반환
     :param model_type: 모델 타입 문자열
     :param num_classes: 클래스 수
+    :param weights: 사전학습 가중치 옵션
     :return: PyTorch 모델
     """
     model_map = {
-        'resnet50': ModelRegistry.get_resnet50,
-        'resnet18': ModelRegistry.get_resnet18,
-        'efficientnet_b0': ModelRegistry.get_efficientnet_b0,
-        'mobilenet_v2': ModelRegistry.get_mobilenet_v2
+        'resnet34': lambda nc, w: ModelRegistry.get_resnet34(nc, w),
+        'resnet50': lambda nc, w: ModelRegistry.get_resnet50(nc, w),
+        'resnet18': lambda nc, w: ModelRegistry.get_resnet18(nc, w),
+        'efficientnet_b0': lambda nc, w: ModelRegistry.get_efficientnet_b0(nc, w),
+        'mobilenet_v2': lambda nc, w: ModelRegistry.get_mobilenet_v2(nc, w),
+        'densenet121': lambda nc, w: ModelRegistry.get_densenet121(nc, w)
     }
     
     model_fn = model_map.get(model_type.lower())
@@ -235,7 +295,7 @@ def get_model(model_type: str, num_classes: int):
         raise ValueError(f"지원하지 않는 모델 타입입니다: {model_type}. "
                        f"지원되는 모델: {list(model_map.keys())}")
     
-    return model_fn(num_classes)
+    return model_fn(num_classes, weights)
 
 def main():
     # 설정 로드
@@ -248,7 +308,8 @@ def main():
     try:
         bucket_name=config['s3']['bucket_name']
         model_path=f"{config['s3']['prefix']}/output/{config['s3']['job_name']}/output/model.tar.gz"
-        results_dir=Path(__file__).parent / f'{config['local']['result_dir']}-{config['s3']['job_name']}'
+        results_dir=Path(__file__).parent.parent / f'{config["local"]["result_dir"]}-{config["s3"]["job_name"]}'
+        weights = config['model'].get('pretrained_weight', None)
         
         model = load_model(
             model_type=config['model']['type'],
@@ -256,7 +317,8 @@ def main():
             bucket_name=bucket_name,
             model_path=model_path,
             results_dir=results_dir,
-            device=device
+            device=device,
+            weights=weights
         )
     except Exception as e:
         print(f's3://{bucket_name}/{model_path}')
@@ -273,7 +335,7 @@ def main():
         )
     ])
 
-    test_data_path = Path(__file__).parent / config['local']['data']['data_dir'] / config['local']['data']['test_dir']
+    test_data_path = Path(__file__).parent.parent / config['local']['data']['data_dir'] / config['local']['data']['test_dir']
     if not test_data_path.exists():
         raise FileNotFoundError(f"테스트 데이터 디렉토리를 찾을 수 없습니다: {test_data_path}")
 
@@ -302,10 +364,13 @@ def main():
         y_true, 
         y_score, 
         class_names,
-        Path(f'{config["local"]["result_dir"]}-{config["s3"]["job_name"]}/{config['local']['output']['visualization_path']}')
+        Path(f'{results_dir}/{config["local"]["output"]["visualization_path"]}')
     )
     
     # 결과 출력
+    report = classification_report(y_true, np.argmax(y_score, axis=1), target_names=class_names, output_dict=True)
+    with open(f'{results_dir}/{config["local"]["output"]["metrics_path"]}', "w") as f:
+        json.dump(report, f, indent=4)
     print("\nClassification Report:")
     print(classification_report(y_true, np.argmax(y_score, axis=1)))
     print("\nROC AUC Scores:")
@@ -314,5 +379,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
