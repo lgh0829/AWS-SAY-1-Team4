@@ -1,0 +1,1 @@
+{"model_type": "resnet50", "num_classes": 3, "pretrained_weight": "IMAGENET1K_V1"}
