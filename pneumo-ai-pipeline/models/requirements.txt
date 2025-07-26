@@ -24,4 +24,3 @@ python-dotenv==1.1.1
 torchxrayvision==1.2.1
 
 transformers==4.40.0
-

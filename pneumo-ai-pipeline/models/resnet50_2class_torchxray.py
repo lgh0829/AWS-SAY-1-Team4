@@ -8,6 +8,8 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 import mlflow
 
+#train_config.yaml에서 num-classes를 2로 설정
+
 def parse_args():
     parser = argparse.ArgumentParser()
     
@@ -22,7 +24,7 @@ def parse_args():
     parser.add_argument('--batch-size', type=int, default=32)
     parser.add_argument('--learning-rate', type=float, default=0.0001)
     parser.add_argument('--model-type', type=str, default='resnet50')
-    parser.add_argument('--num-classes', type=int, default=3)
+    parser.add_argument('--num-classes', type=int, default=2)
     parser.add_argument('--patience', type=int, default=5)
     
     return parser.parse_args()
@@ -30,27 +32,50 @@ def parse_args():
 def get_transforms():
     data_transforms = transforms.Compose([
         transforms.Resize((224, 224)),
+        transforms.Grayscale(num_output_channels=1),
         transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        transforms.Normalize([0.5], [0.5])
     ])
     
     train_transforms = transforms.Compose([
-        transforms.Resize((224, 224)),
+        transforms.Resize((256, 256)),
+        transforms.Grayscale(num_output_channels=1),
+        transforms.RandomHorizontalFlip(p=0.5),
         transforms.RandomRotation(15),
         transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
-        transforms.ColorJitter(brightness=0.15, contrast=0.2),
+        transforms.ColorJitter(contrast=0.2),
+        transforms.RandomApply([transforms.GaussianBlur(kernel_size=5, sigma=(0.1, 2.0))], p=0.2),
+        transforms.RandomApply([transforms.RandomAdjustSharpness(sharpness_factor=2)], p=0.3),
         transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406],
-                             [0.229, 0.224, 0.225])
-])
+        transforms.Normalize([0.5],
+                             [0.5])
+    ])
+    
     
     return train_transforms, data_transforms
 
 def create_model(model_type, num_classes, device):
-    if model_type == 'resnet50':
-        model = models.resnet50(weights='IMAGENET1K_V1')
-        model.fc = nn.Linear(model.fc.in_features, num_classes)
-    return model.to(device)
+    if model_type == "resnet50":
+        import torchxrayvision as xrv
+        import torch.nn as nn
+
+        # ✅ torchxrayvision에서 ResNet50 불러오기
+        model = xrv.models.ResNet(weights="resnet50-res512-all")
+
+        # ✅ classifier 수정 (주의: .model.fc)
+        in_features = model.model.fc.in_features
+        model.model.fc = nn.Linear(in_features, num_classes)
+        
+        model.op_threshs = None
+
+        # ✅ 추가 정보
+        model.n_outputs = num_classes
+        model.pathologies = [f"class_{i}" for i in range(num_classes)]
+
+        return model.to(device)
+
+    else:
+        raise ValueError("지원하지 않는 모델 타입입니다.")
 
 def train_epoch(model, train_loader, criterion, optimizer, device):
     model.train()
@@ -205,10 +230,7 @@ def main():
                     break
             
             scheduler.step(val_acc)
-            
-        # 최종 모델 저장
-        model.load_state_dict(torch.load(os.path.join(args.model_dir, 'model.pth')))
-
+        
         # 최종 테스트
         test_loss, test_acc = validate(model, test_loader, criterion, device)
         print(f"Final Test Accuracy: {test_acc:.2f}%")

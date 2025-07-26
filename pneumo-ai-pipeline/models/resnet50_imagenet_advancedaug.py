@@ -66,7 +66,7 @@ def get_transforms():
         transforms.RandomHorizontalFlip(p=0.5),
         transforms.RandomRotation(15),
         transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
-        transforms.ColorJitter(brightness=0.2, contrast=0.2),
+        transforms.ColorJitter(contrast=0.2),
         transforms.RandomApply([Cutout(size=32)], p=0.3),
         transforms.RandomApply([transforms.GaussianBlur(kernel_size=5, sigma=(0.1, 2.0))], p=0.2),
         transforms.RandomApply([transforms.RandomAdjustSharpness(sharpness_factor=2)], p=0.3),

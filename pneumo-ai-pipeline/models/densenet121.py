@@ -9,6 +9,10 @@ from tqdm import tqdm
 import mlflow
 import mlflow.pytorch
 import torchxrayvision as xrv
+from PIL import Image
+import numpy as np
+import random
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -29,26 +33,25 @@ def parse_args():
     
     return parser.parse_args()
 
+class XRVTrainTransform:
+    def __init__(self):
+        self.base_transform = xrv.datasets.XRayCenterCrop()
+
+    def __call__(self, img):
+        # PIL → numpy
+        img = np.array(img)
+
+        # 수평 뒤집기 (50% 확률)
+        if random.random() > 0.5:
+            img = np.fliplr(img).copy()
+
+        # torchxrayvision transform 적용 (3채널 복제, Tensor 변환)
+        return self.base_transform(Image.fromarray(img))
+
+
 def get_transforms():
-    data_transforms = transforms.Compose([
-        transforms.Grayscale(num_output_channels=1),  # ✅ 핵심
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-        transforms.Normalize([0.5], [0.5])
-])
-
-    
-    train_transforms = transforms.Compose([
-        transforms.Grayscale(num_output_channels=1),  # ✅ 핵심
-        transforms.Resize((224, 224)),
-        transforms.RandomRotation(15),
-        transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
-        transforms.ColorJitter(brightness=0.15, contrast=0.2),
-        transforms.ToTensor(),
-        transforms.Normalize([0.5], [0.5])  # ✅ 1채널 정규화
-])
-
-    
+    train_transforms = XRVTrainTransform()
+    data_transforms = xrv.datasets.XRayCenterCrop()
     return train_transforms, data_transforms
 
 def create_model(model_type, num_classes, device):
@@ -241,6 +244,7 @@ def main():
         
         scheduler.step(val_acc)
     
+    model.load_state_dict(torch.load(os.path.join(args.model_dir, 'model.pth')))
     # 최종 테스트
     test_loss, test_acc = validate(model, test_loader, criterion, device)
     print(f"Final Test Accuracy: {test_acc:.2f}%")

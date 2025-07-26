@@ -16,6 +16,7 @@ import tarfile
 import torchvision.models as models
 from torchvision import datasets, transforms
 import json
+from transformers import AutoModelForImageClassification
 
 # 현재 파일의 상위 디렉토리(프로젝트 루트)로 경로 설정
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -196,8 +197,12 @@ class ModelRegistry:
     
     @staticmethod
     def get_resnet34(num_classes, weights=None):
-        model = models.resnet34(weights=None)
-        model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
+        if weights == "IMAGENET1K_V1":
+            model = models.resnet34(weights=models.ResNet34_Weights.IMAGENET1K_V1)
+            model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
+        else:
+            model = models.resnet34(weights=None)
+            model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
         return model
     
     @staticmethod
@@ -207,7 +212,21 @@ class ModelRegistry:
             model = xrv.models.ResNet(weights="resnet50-res512-all")
             in_features = model.model.fc.in_features
             model.model.fc = torch.nn.Linear(in_features, num_classes)
+            model.op_threshs = None
             model.n_outputs = num_classes
+            model.pathologies = [f"class_{i}" for i in range(num_classes)]
+        
+        elif weights == "IMAGENET1K_V1":
+            model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V1)
+            model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
+
+        elif weights == "microsoft/resnet-50":
+            model = AutoModelForImageClassification.from_pretrained(
+                "microsoft/resnet-50",
+                num_labels=num_classes,
+                ignore_mismatched_sizes=True
+            )
+
         else:
             model = models.resnet50(weights=None)
             model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
@@ -327,12 +346,9 @@ def main():
     
     # 테스트 데이터 로드
     transform = transforms.Compose([
-        transforms.Resize((224, 224)),  # ResNet 입력 크기에 맞게 조정
+        transforms.Resize((224, 224)),
         transforms.ToTensor(),
-        transforms.Normalize(
-            mean=[0.485, 0.456, 0.406],  # ImageNet 표준 정규화 값
-            std=[0.229, 0.224, 0.225]
-        )
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
 
     test_data_path = Path(__file__).parent.parent / config['local']['data']['data_dir'] / config['local']['data']['test_dir']

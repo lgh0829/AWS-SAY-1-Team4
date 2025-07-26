@@ -22,7 +22,7 @@ def parse_args():
     parser.add_argument('--batch-size', type=int, default=32)
     parser.add_argument('--learning-rate', type=float, default=0.0001)
     parser.add_argument('--model-type', type=str, default='resnet50')
-    parser.add_argument('--num-classes', type=int, default=3)
+    parser.add_argument('--num-classes', type=int, default=2)
     parser.add_argument('--patience', type=int, default=5)
     
     return parser.parse_args()
@@ -86,6 +86,13 @@ def validate(model, val_loader, criterion, device):
     
     with torch.no_grad():
         for images, labels in val_loader:
+            # class==2 제거
+            mask = (labels == 0) | (labels == 1)
+            if mask.sum() == 0:
+                continue  # 모두 제거된 경우
+            images = images[mask]
+            labels = labels[mask]
+
             images, labels = images.to(device), labels.to(device)
             outputs = model(images)
             loss = criterion(outputs, labels)
@@ -96,6 +103,7 @@ def validate(model, val_loader, criterion, device):
             correct += predicted.eq(labels).sum().item()
     
     return val_loss / len(val_loader), 100. * correct / total
+
 
 def get_device():
     """
@@ -205,10 +213,7 @@ def main():
                     break
             
             scheduler.step(val_acc)
-            
-        # 최종 모델 저장
-        model.load_state_dict(torch.load(os.path.join(args.model_dir, 'model.pth')))
-
+        
         # 최종 테스트
         test_loss, test_acc = validate(model, test_loader, criterion, device)
         print(f"Final Test Accuracy: {test_acc:.2f}%")

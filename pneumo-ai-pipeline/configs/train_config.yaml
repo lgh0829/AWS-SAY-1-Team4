@@ -1,5 +1,5 @@
 # SageMaker 훈련 설정
-entry_point: "resnet50_imagenet_advancedaug.py"
+entry_point: "densenet121.py"
 source_dir: "models"
 instance_count: 1
 instance_type: "ml.g4dn.xlarge"  # GPU 인스턴스
@@ -29,7 +29,7 @@ mlflow: null
 hyperparameters:
   epochs: 200
   batch-size: 32
-  learning-rate: 0.0001
-  model-type: "resnet50"  
+  learning-rate: 0.00001
+  model-type: "densenet121"  
   num-classes: 3
   patience: 10

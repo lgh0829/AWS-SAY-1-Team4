@@ -4,9 +4,14 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torchvision import datasets, transforms, models
-from torch.utils.data import DataLoader
+import torchvision.transforms.functional as F
+from torch.utils.data import DataLoader, WeightedRandomSampler
 from tqdm import tqdm
 import mlflow
+import random
+from PIL import Image
+
+#train_config.yaml에서 num-classes를 2로 설정
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -22,10 +27,32 @@ def parse_args():
     parser.add_argument('--batch-size', type=int, default=32)
     parser.add_argument('--learning-rate', type=float, default=0.0001)
     parser.add_argument('--model-type', type=str, default='resnet50')
-    parser.add_argument('--num-classes', type=int, default=3)
+    parser.add_argument('--num-classes', type=int, default=2)
     parser.add_argument('--patience', type=int, default=5)
     
     return parser.parse_args()
+
+class Cutout(object):
+    def __init__(self, size=32):
+        self.size = size
+
+    def __call__(self, img):
+        # 이미지가 PIL 이미지인 경우 텐서로 변환
+        if not torch.is_tensor(img):
+            img = F.to_tensor(img)
+            tensor_converted = True
+        else:
+            tensor_converted = False
+            
+        h, w = img.shape[1], img.shape[2]
+        y = random.randint(0, h - self.size)
+        x = random.randint(0, w - self.size)
+        img[:, y:y+self.size, x:x+self.size] = 0
+        
+        # 원래 PIL 이미지였다면 다시 PIL로 변환
+        if tensor_converted:
+            img = F.to_pil_image(img)
+        return img
 
 def get_transforms():
     data_transforms = transforms.Compose([
@@ -35,20 +62,27 @@ def get_transforms():
     ])
     
     train_transforms = transforms.Compose([
-        transforms.Resize((224, 224)),
+        transforms.Resize((256, 256)),
+        transforms.RandomResizedCrop(224, scale=(0.9, 1.0)),
+        transforms.RandomHorizontalFlip(p=0.5),
         transforms.RandomRotation(15),
         transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
-        transforms.ColorJitter(brightness=0.15, contrast=0.2),
+        transforms.ColorJitter(contrast=0.2),
+        transforms.RandomApply([Cutout(size=32)], p=0.3),
+        transforms.RandomApply([transforms.GaussianBlur(kernel_size=5, sigma=(0.1, 2.0))], p=0.2),
+        transforms.RandomApply([transforms.RandomAdjustSharpness(sharpness_factor=2)], p=0.3),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406],
                              [0.229, 0.224, 0.225])
-])
+    ])
     
     return train_transforms, data_transforms
 
 def create_model(model_type, num_classes, device):
     if model_type == 'resnet50':
         model = models.resnet50(weights='IMAGENET1K_V1')
+        for param in model.parameters():
+            param.requires_grad = True
         model.fc = nn.Linear(model.fc.in_features, num_classes)
     return model.to(device)
 
@@ -205,10 +239,7 @@ def main():
                     break
             
             scheduler.step(val_acc)
-            
-        # 최종 모델 저장
-        model.load_state_dict(torch.load(os.path.join(args.model_dir, 'model.pth')))
-
+        
         # 최종 테스트
         test_loss, test_acc = validate(model, test_loader, criterion, device)
         print(f"Final Test Accuracy: {test_acc:.2f}%")
