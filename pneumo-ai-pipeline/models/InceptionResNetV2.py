@@ -3,12 +3,11 @@ import argparse
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torchvision import datasets, transforms
+from torchvision import datasets, transforms, models
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import mlflow
-import mlflow.pytorch
-import torchxrayvision as xrv
+import timm
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -30,60 +29,28 @@ def parse_args():
     return parser.parse_args()
 
 def get_transforms():
-
     data_transforms = transforms.Compose([
-        transforms.Grayscale(num_output_channels=1),  # ✅ 핵심
-        transforms.Resize((224, 224)),
+        transforms.Resize((299, 299)),
         transforms.ToTensor(),
-        transforms.Normalize([0.5], [0.5])
-        ])
-
+        transforms.Normalize([0.5]*3, [0.5]*3)
+    ])
     
     train_transforms = transforms.Compose([
-        transforms.Grayscale(num_output_channels=1),  # ✅ 핵심
-        transforms.Resize((224, 224)),
+        transforms.Resize((299, 299)),
         transforms.RandomRotation(15),
         transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
         transforms.ColorJitter(brightness=0.15, contrast=0.2),
         transforms.ToTensor(),
-        transforms.Normalize([0.5], [0.5])  # ✅ 1채널 정규화
-        ])
-
-
+        transforms.Normalize([0.5]*3, [0.5]*3)
+])
     
     return train_transforms, data_transforms
 
 def create_model(model_type, num_classes, device):
-    if model_type == 'densenet121':
-        import torchxrayvision as xrv
-        import os
-        import torch.nn as nn
-        import torch
-
-        # ✅ 사전학습 weight 수동 다운로드
-        model_dir = "/root/.torchxrayvision/models_data"
-        os.makedirs(model_dir, exist_ok=True)
-
-        model_path = os.path.join(
-            model_dir,
-            "nih-pc-chex-mimic_ch-google-openi-kaggle-densenet121-d121-tw-lr001-rot45-tr15-sc15-seed0-best.pt"
-        )
-
-        if not os.path.exists(model_path):
-            os.system(f"wget https://github.com/mlmed/torchxrayvision/releases/download/v1/nih-pc-chex-mimic_ch-google-openi-kaggle-densenet121-d121-tw-lr001-rot45-tr15-sc15-seed0-best.pt -O {model_path}")
-
-
-        model = torch.load(model_path, map_location=device)  # ✅ 그냥 모델 자체를 불러와!
-
-        # ✅ 3. classifier 수정
-        in_features = model.classifier.in_features
-        model.classifier = nn.Linear(in_features, num_classes)
-        model.n_outputs = num_classes
-        model.pathologies = [f"class_{i}" for i in range(num_classes)]
-
-        return model.to(device)
-    else:
-        raise ValueError("지원하지 않는 모델 타입입니다.")
+    if model_type == 'inceptionresnetv2':
+        model = timm.create_model("inception_resnet_v2", pretrained=True)
+        model.classifier = torch.nn.Linear(model.classifier.in_features, num_classes)
+    return model.to(device)
 
 def train_epoch(model, train_loader, criterion, optimizer, device):
     model.train()
@@ -190,67 +157,59 @@ def main():
                            pin_memory=device.type=='cuda')
     
     # 모델 설정
-    model = create_model(args.model_type, args.num_classes, device)
+    model = timm.create_model(args.model_type, pretrained=True)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', 
                                                     factor=0.1, patience=3)
     
-    # MLflow 사용 여부 확인
-    use_mlflow = bool(os.environ.get('MLFLOW_TRACKING_URI')) and bool(os.environ.get('MLFLOW_EXPERIMENT_NAME'))
-    
-    if use_mlflow:
-        mlflow.start_run()
+    # MLflow 실험 시작
+    with mlflow.start_run():
         mlflow.log_params(vars(args))
-    
-    best_val_acc = 0.0
-    patience_counter = 0
-    
-    for epoch in range(args.epochs):
-        # 훈련
-        train_loss, train_acc = train_epoch(model, train_loader, criterion, optimizer, device)
         
-        # 검증
-        val_loss, val_acc = validate(model, val_loader, criterion, device)
+        best_val_acc = 0.0
+        patience_counter = 0
         
-        # MLflow 로그 기록
-        if use_mlflow:
+        for epoch in range(args.epochs):
+            # 훈련
+            train_loss, train_acc = train_epoch(model, train_loader, 
+                                              criterion, optimizer, device)
+            
+            # 검증
+            val_loss, val_acc = validate(model, val_loader, criterion, device)
+            
+            # 로그 기록
             mlflow.log_metrics({
                 'train_loss': train_loss,
                 'train_accuracy': train_acc,
                 'val_loss': val_loss,
                 'val_accuracy': val_acc
             }, step=epoch)
-        
-        print(f"Epoch {epoch+1}/{args.epochs}")
-        print(f"Train Loss: {train_loss:.4f}, Acc: {train_acc:.2f}%")
-        print(f"Val Loss: {val_loss:.4f}, Acc: {val_acc:.2f}%")
-        
-        # Early Stopping 체크
-        if val_acc > best_val_acc:
-            best_val_acc = val_acc
-            patience_counter = 0
-            # 모델 저장
-            model_path = os.path.join(args.model_dir, 'model.pth')
-            torch.save(model.state_dict(), model_path)
-            if use_mlflow:
+            
+            print(f"Epoch {epoch+1}/{args.epochs}")
+            print(f"Train Loss: {train_loss:.4f}, Acc: {train_acc:.2f}%")
+            print(f"Val Loss: {val_loss:.4f}, Acc: {val_acc:.2f}%")
+            
+            # Early Stopping 체크
+            if val_acc > best_val_acc:
+                best_val_acc = val_acc
+                patience_counter = 0
+                # 모델 저장
+                model_path = os.path.join(args.model_dir, 'model.pth')
+                torch.save(model.state_dict(), model_path)
                 mlflow.log_artifact(model_path)
-        else:
-            patience_counter += 1
-            if patience_counter >= args.patience:
-                print(f"Early stopping at epoch {epoch+1}")
-                break
+            else:
+                patience_counter += 1
+                if patience_counter >= args.patience:
+                    print(f"Early stopping at epoch {epoch+1}")
+                    break
+            
+            scheduler.step(val_acc)
         
-        scheduler.step(val_acc)
-    
-    # 최종 테스트
-    test_loss, test_acc = validate(model, test_loader, criterion, device)
-    print(f"Final Test Accuracy: {test_acc:.2f}%")
-    
-    if use_mlflow:
+        # 최종 테스트
+        test_loss, test_acc = validate(model, test_loader, criterion, device)
+        print(f"Final Test Accuracy: {test_acc:.2f}%")
         mlflow.log_metric('test_accuracy', test_acc)
-        mlflow.pytorch.log_model(model, artifact_path="model")
-        mlflow.end_run()
 
 if __name__ == '__main__':
     main()

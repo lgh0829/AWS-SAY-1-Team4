@@ -11,10 +11,10 @@ models = {
         url="https://github.com/alimbekovKZ/lungs_segmentation/releases/download/1.0.0/resnet34.pth",
         model=Unet.Resnet(seg_classes=2, backbone_arch="resnet34"),
     ),
-    "densenet121": model(
-        url="https://github.com/alimbekovKZ/lungs_segmentation/releases/download/1.0.0/densenet121.pth",
-        model=Unet.DensenetUnet(seg_classes=2, backbone_arch="densenet121"),
-    ),
+    # "densenet121": model(
+    #     url="https://github.com/alimbekovKZ/lungs_segmentation/releases/download/1.0.0/densenet121.pth",
+    #     model=Unet.DensenetUnet(seg_classes=2, backbone_arch="densenet121"),
+    # ),
 }
 
 

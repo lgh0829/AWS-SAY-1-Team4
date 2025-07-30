@@ -1,0 +1,68 @@
+# SageMaker 배포 설정
+framework_version: "1.13.1"  # 안정적인 PyTorch 버전
+py_version: "py39"           # Python 3.9
+
+# S3 설정
+s3:
+  bucket_name: "${S3_BUCKET_NAME}"  # S3 버킷 이름
+  prefix: "cxr-pneumonia-4"
+  job_name: "aws-say1-4team-2025-07-10-15-18-09-2025-07-20-06-18-09-045"
+local:
+  result_dir: "results"  # 로컬 성능지표 저장 디렉토리
+
+# 서버리스 설정
+serverless:
+  memory_size_in_mb: 6144  # 메모리 크기 (MB)
+  max_concurrency: 5       # 최대 동시 요청 수
+
+# real-time inference 설정
+realtime:
+  instance_type: "ml.g4dn.xlarge"  # 인스턴스 타입
+  instance_count: 1                # 인스턴스 개수
+
+# # ascync inference 설정
+# ascync:
+#   instance_type: "ml.g4dn.xlarge"  # 인스턴스 타입
+#   instance_count: 1                # 인스턴스 개수
+#   output_path: "s3://${S3_BUCKET_NAME}/cxr-pneumonia-4/ascync_output"  # 결과 저장 경로
+
+
+# ---- deploy info ----
+# model_config.yaml
+model:
+  type: "resnet34"  # 모델 이름
+  num_classes: 3    # 클래스 수
+  pretrained_weight: "IMAGENET1K_V1"  # 사전 훈련된 모델 사용 여부
+
+# preprocess_config.yaml
+# 전처리 설정
+preprocessing:
+  # 적용할 전처리 단계 (True/False로 설정)
+  steps:
+    convert_grayscale: True
+    apply_clahe: True
+    apply_gaussian_blur: True
+    apply_min_max_stretch: True
+    apply_sharpening: False
+    convert_to_rgb: False
+  
+  # 전처리 파라미터
+  params:
+    clahe:
+      clip_limit: 2.0
+      grid_size: [8, 8]
+    gaussian_blur:
+      radius: 0.2
+    min_max_stretch:
+      lower_percentile: 1
+      upper_percentile: 99
+    sharpening:
+      radius: 2
+      percent: 150
+      threshold: 3
+
+# transform_config.yaml
+image_resize: [224, 224]
+normalize:
+  mean: [0.485, 0.456, 0.406]
+  std: [0.229, 0.224, 0.225]

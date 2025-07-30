@@ -1,5 +1,5 @@
 # SageMaker 훈련 설정
-entry_point: "resnet50_imagenet_advancedaug.py"
+entry_point: "densenet121.py"
 source_dir: "models"
 instance_count: 1
 instance_type: "ml.g4dn.xlarge"  # GPU 인스턴스
@@ -11,9 +11,9 @@ base_job_name: "aws-say1-4team"  # SageMaker 작업 이름
 s3:
   bucket_name: "${S3_BUCKET_NAME}"  # S3 버킷 이름
   prefix: "cxr-pneumonia-4"
-  train_prefix: "preprocessed/train"
-  val_prefix: "preprocessed/val"
-  test_prefix: "preprocessed/test"
+  train_prefix: "raw/train"
+  val_prefix: "raw/val"
+  test_prefix: "raw/test"
 local:
   data_dir: "../data"  # 로컬 데이터 디렉토리
   train_dir: "train"
@@ -29,7 +29,7 @@ mlflow: null
 hyperparameters:
   epochs: 200
   batch-size: 32
-  learning-rate: 0.0001
-  model-type: "resnet50"  
+  learning-rate: 1e-5
+  model-type: "densenet121"
   num-classes: 3
   patience: 10
