@@ -44,7 +44,7 @@ def model_fn(model_dir):
                               else "cpu")
         logger.info(f"디바이스 설정 완료: {device}")
 
-        model = models.resnet50(weights='IMAGENET1K_V1')
+        model = models.resnet50(weights=None)
         model.fc = nn.Linear(model.fc.in_features, 3)
         logger.info("ResNet50 모델 구조 정의 완료")
 

@@ -22,7 +22,7 @@ HEATMAP_BUCKET = "say1-4team-bucket"
 HEATMAP_PREFIX = "sagemaker/test"
 
 # (4) 생성할 엔드포인트 이름
-ENDPOINT_NAME = 'say1-4team-realtime-endpoint' + strftime("%Y-%m-%d-%H-%M-%S", gmtime())
+ENDPOINT_NAME = 'say1-4team-inference-endpoint-' + strftime("%Y-%m-%d-%H-%M-%S", gmtime())
 
 # ─────────────────────────────────────────────────────────────
 # 2) SageMaker 세션 생성
@@ -57,7 +57,7 @@ pytorch_model = PyTorchModel(
 print(f"▶ Deploying realtime endpoint '{ENDPOINT_NAME}' ...")
 predictor = pytorch_model.deploy(
     endpoint_name=ENDPOINT_NAME,
-    instance_type="ml.g4dn.xlarge",           # ← 인스턴스 타입 지정
+    instance_type="ml.m5.xlarge",           # ← 인스턴스 타입 지정
     initial_instance_count=1,               # ← 인스턴스 개수 지정
     tags=[
         {
