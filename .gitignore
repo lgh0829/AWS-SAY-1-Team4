@@ -5,6 +5,7 @@ __pycache__/
 *.pyo
 *.gz
 *.pth
+*.pt
 
 # Distribution / packaging
 .Python
@@ -51,3 +52,6 @@ experiments/
 **/data/
 **/data/**
 data/
+**/downloaded_low_conf/
+**/downloaded_low_conf/**
+downloaded_low_conf/

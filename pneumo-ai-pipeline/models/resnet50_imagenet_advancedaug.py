@@ -80,6 +80,8 @@ def get_transforms():
 def create_model(model_type, num_classes, device):
     if model_type == 'resnet50':
         model = models.resnet50(weights='IMAGENET1K_V1')
+        for param in model.parameters():
+            param.requires_grad = True
         model.fc = nn.Linear(model.fc.in_features, num_classes)
     return model.to(device)
 
@@ -277,6 +279,8 @@ def main():
                     break
             
             scheduler.step(val_acc)
+            
+        model.load_state_dict(torch.load(os.path.join(args.model_dir, 'model.pth')))
         
         # 최종 테스트
         test_loss, test_acc = validate(model, test_loader, criterion, device)

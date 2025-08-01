@@ -2,8 +2,8 @@ import os
 import argparse
 from torchvision import datasets, transforms  
 from torch.utils.data import DataLoader
+from torch.utils.data import Dataset
 import torch
-import torch.nn as nn
 import torch.optim as optim
 from torchvision import models
 from tqdm import tqdm
@@ -16,6 +16,7 @@ import sagemaker
 from sagemaker.pytorch import PyTorch
 from pathlib import Path
 import dotenv
+
 
 dotenv.load_dotenv()
 dotenv.load_dotenv(Path(__file__).parent / '.env')
@@ -65,7 +66,7 @@ def check_s3_images(session, bucket, prefix):
     s3_client = session.boto_session.client('s3')
     
     # 이미지 파일 확장자
-    image_extensions = {'.jpg', '.jpeg', '.png'}
+    image_extensions = {'.jpg', '.jpeg', '.png', '.pt', '.txt'}
     
     try:
         # S3 객체 리스트 가져오기
@@ -105,7 +106,8 @@ def run_training():
         channels = {
             'train': f"{s3_config['prefix']}/{s3_config['train_prefix']}",
             'val': f"{s3_config['prefix']}/{s3_config['val_prefix']}",
-            'test': f"{s3_config['prefix']}/{s3_config['test_prefix']}"
+            'test': f"{s3_config['prefix']}/{s3_config['test_prefix']}",
+            'mask': f"{s3_config['prefix']}/{s3_config['mask_prefix']}"
         }
         
         # 각 채널 확인

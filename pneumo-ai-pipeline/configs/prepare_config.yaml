@@ -1,24 +1,24 @@
 # 처리 단계 설정
 steps:
-  download_from_s3: True   # S3에서 다운로드 여부
-  segment_lungs: True        # 폐 분할 여부
-  preprocess_images: True     # 이미지 전처리 여부
-  upload_to_s3: True          # S3에 업로드 여부
+  download_from_s3: False   # S3에서 다운로드 여부
+  segment_lungs: True  # 폐 분할 여부
+  preprocess_images: True   # 이미지 전처리 여부
+  upload_to_s3: True         # S3에 업로드 여부
 
 # S3 설정
 s3:
   bucket_name: "${S3_BUCKET_NAME}"  # S3 버킷 이름
   prefix: "cxr-pneumonia-4"
   input_prefix: "raw"
-  segmented_prefix: "segmented"
-  preprocessed_prefix: "preprocessed-3"
+  segmented_prefix: "masks"
+  preprocessed_prefix: "nosegpreprocessed"
 
 # 디렉토리 설정
 directories:
   data_dir: "data"          # 데이터 디렉토리
   input_dir: "raw"          # 원본 데이터 디렉토리
-  segmented_dir: "segmented"     # 폐 분할 결과 디렉토리
-  preprocessed_dir: "preprocessed-3"  # 전처리 결과 디렉토리
+  segmented_dir: "masks"     # 폐 분할 결과 디렉토리
+  preprocessed_dir: "nosegpreprocessed"  # 전처리 결과 디렉토리
 
 # 전처리 설정
 preprocessing:
@@ -27,9 +27,9 @@ preprocessing:
     convert_grayscale: True
     apply_clahe: True
     apply_gaussian_blur: True
-    apply_min_max_stretch: False
-    apply_sharpening: True
-    convert_to_rgb: True
+    apply_min_max_stretch: True
+    apply_sharpening: False
+    convert_to_rgb: False
   
   # 전처리 파라미터
   params:
@@ -37,7 +37,7 @@ preprocessing:
       clip_limit: 2.0
       grid_size: [8, 8]
     gaussian_blur:
-      radius: 0.3
+      radius: 0.2
     min_max_stretch:
       lower_percentile: 1
       upper_percentile: 99

@@ -2,7 +2,7 @@
 s3:
   bucket_name: "${S3_BUCKET_NAME}"  # S3 버킷 이름
   prefix: "cxr-pneumonia-4"
-  job_name: "aws-say1-4team-2025-07-20-15-18-09-2025-07-20-06-18-09-045"
+  job_name: "aws-say1-4team-2025-07-29-10-58-26-2025-07-29-01-58-26-955"
 local:
   data: 
     data_dir: "data"  # 로컬 데이터 디렉토리

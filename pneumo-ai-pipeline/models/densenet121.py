@@ -33,25 +33,37 @@ def parse_args():
     
     return parser.parse_args()
 
+
+
 class XRVTrainTransform:
     def __init__(self):
         self.base_transform = xrv.datasets.XRayCenterCrop()
 
     def __call__(self, img):
-        # PIL → numpy
-        img = np.array(img)
+        # 1. PIL 이미지가 아닌 경우 예외 처리
+        if isinstance(img, Image.Image):
+            img = np.array(img)
+        elif isinstance(img, np.ndarray):
+            pass  # 사용자가 이미 numpy로 전달한 경우
+        else:
+            raise TypeError(f"[XRVTrainTransform] Invalid input type: {type(img)}")
 
-        # 수평 뒤집기 (50% 확률)
+        # 2. 흑백 이미지가 아니면 강제 변환
+        if img.ndim == 3 and img.shape[2] > 1:
+            img = img[:, :, 0]  # 첫 채널만 사용
+
+        # 3. 수평 뒤집기 (50% 확률)
         if random.random() > 0.5:
             img = np.fliplr(img).copy()
 
-        # torchxrayvision transform 적용 (3채널 복제, Tensor 변환)
+        # 4. torchxrayvision transform 적용
         return self.base_transform(Image.fromarray(img))
 
 
-def get_transforms():
-    train_transforms = XRVTrainTransform()
-    data_transforms = xrv.datasets.XRayCenterCrop()
+def get_transforms(mode="xrv"):
+    if mode == "xrv":
+        train_transforms = XRVTrainTransform()
+        data_transforms = xrv.datasets.XRayCenterCrop()
     return train_transforms, data_transforms
 
 def create_model(model_type, num_classes, device):

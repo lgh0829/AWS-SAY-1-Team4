@@ -205,6 +205,8 @@ def main():
                     break
             
             scheduler.step(val_acc)
+            
+            model.load_state_dict(torch.load(os.path.join(args.model_dir, 'model.pth')))
         
         # 최종 테스트
         test_loss, test_acc = validate(model, test_loader, criterion, device)

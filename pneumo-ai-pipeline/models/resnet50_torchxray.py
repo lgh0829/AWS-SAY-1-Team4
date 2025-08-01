@@ -33,8 +33,7 @@ def get_transforms():
     data_transforms = transforms.Compose([
         transforms.Resize((224, 224)),
         transforms.Grayscale(num_output_channels=1),
-        transforms.ToTensor(),
-        transforms.Normalize([0.5], [0.5])
+        xrv.datasets.TransformXRay()
     ])
     
     train_transforms = transforms.Compose([
@@ -42,10 +41,8 @@ def get_transforms():
         transforms.Grayscale(num_output_channels=1),
         transforms.RandomRotation(15),
         transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
-        transforms.ColorJitter(brightness=0.15, contrast=0.2),
-        transforms.ToTensor(),
-        transforms.Normalize([0.5],
-                             [0.5])
+        transforms.ColorJitter(contrast=0.2),
+        xrv.datasets.TransformXRay()
 ])
 
 
@@ -236,7 +233,9 @@ def main():
                 break
         
         scheduler.step(val_acc)
-    
+        
+        model.load_state_dict(torch.load(os.path.join(args.model_dir, 'model.pth')))
+ 
     # 최종 테스트
     test_loss, test_acc = validate(model, test_loader, criterion, device)
     print(f"Final Test Accuracy: {test_acc:.2f}%")

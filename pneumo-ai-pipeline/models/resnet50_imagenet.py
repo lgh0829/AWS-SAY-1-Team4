@@ -2,11 +2,15 @@ import os
 import argparse
 import torch
 import torch.nn as nn
+import torch.nn.init as init
 import torch.optim as optim
-from torchvision import datasets, transforms, models
+from torchvision import models
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import mlflow
+import kornia.augmentation as K
+from pathlib import Path
+from torch.utils.data import Dataset
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -24,33 +28,84 @@ def parse_args():
     parser.add_argument('--model-type', type=str, default='resnet50')
     parser.add_argument('--num-classes', type=int, default=3)
     parser.add_argument('--patience', type=int, default=5)
-    
+    parser.add_argument('--augment',       type=lambda x: x.lower()=='true',
+                        default=False,
+                        help="pt 데이터셋에 증강을 적용할지 여부")
     return parser.parse_args()
 
-def get_transforms():
-    data_transforms = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-    ])
-    
-    train_transforms = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.RandomRotation(15),
-        transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
-        transforms.ColorJitter(brightness=0.15, contrast=0.2),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406],
-                             [0.229, 0.224, 0.225])
-])
-    
-    return train_transforms, data_transforms
+
 
 def create_model(model_type, num_classes, device):
     if model_type == 'resnet50':
         model = models.resnet50(weights='IMAGENET1K_V1')
+        old_conv = model.conv1
+        model.conv1 = nn.Conv2d(
+            in_channels=4,
+            out_channels=old_conv.out_channels,
+            kernel_size=old_conv.kernel_size,
+            stride=old_conv.stride,
+            padding=old_conv.padding,
+            bias=(old_conv.bias is not None)
+        )
+
+        # 3) 가중치 초기화: 기존 RGB 복사 + mask 채널 He 초기화
+        with torch.no_grad():
+            w_old = old_conv.weight              # [64,3,7,7]
+            w_new = torch.zeros_like(model.conv1.weight)  # [64,4,7,7]
+            w_new[:, :3, :, :] = w_old            # RGB 복사
+            init.kaiming_normal_(                # 마스크 채널은 He 초기화
+                w_new[:, 3:4, :, :],
+                mode='fan_out',
+                nonlinearity='relu'
+            )
+            model.conv1.weight.copy_(w_new)
+
+        # 4) FC 레이어 재설정
         model.fc = nn.Linear(model.fc.in_features, num_classes)
+
+    else:
+        raise ValueError(f"Unsupported model type: {model_type}")
+
     return model.to(device)
+
+
+class PTTensorDataset(Dataset):
+    def __init__(self, root_dir, augment=False):
+        # .pt 파일 리스트 (서브폴더명이 레이블)
+        self.files   = list(Path(root_dir).rglob('*.pt'))
+        self.augment = augment
+        if augment:
+            # 배치 단위로 처리하는 Kornia 증강기 선언
+            self.augs = nn.Sequential(
+                K.Resize((224,224)),
+                K.RandomRotation(15.0, p=0.5),
+                K.RandomAffine(degrees=0.0, translate=(0.1,0.1), p=0.5),
+            )
+
+    def __len__(self):
+        return len(self.files)
+
+    def __getitem__(self, idx):
+        # 1) .pt에서 [4, H, W] 텐서와 레이블 로드
+        tensor = torch.load(self.files[idx])           # float Tensor
+        label  = int(self.files[idx].parent.name)      # 폴더명이 클래스
+
+        # 2) 증강 (학습 시만)
+        if self.augment:
+            x = tensor.unsqueeze(0)    # [1,4,H,W]
+            x = self.augs(x)           # [1,4,224,224]
+            tensor = x.squeeze(0)      # [4,224,224]
+
+        # 3) 채널별 정규화
+        #   - RGB 채널: ImageNet mean/std
+        #   - mask 채널: mean=0, std=1 (변경 없이)
+        mean = torch.tensor([0.485, 0.456, 0.406, 0.0], device=tensor.device)
+        std  = torch.tensor([0.229, 0.224, 0.225, 1.0], device=tensor.device)
+        tensor = (tensor - mean[:,None,None]) / std[:,None,None]
+
+        return tensor, label
+
+
 
 def train_epoch(model, train_loader, criterion, optimizer, device):
     model.train()
@@ -97,6 +152,32 @@ def validate(model, val_loader, criterion, device):
     
     return val_loss / len(val_loader), 100. * correct / total
 
+
+def evaluate_with_soft_triage(model, test_loader, device, threshold=0.7):
+    model.eval()
+    correct = 0
+    total = 0
+    criterion = nn.CrossEntropyLoss()
+    running_loss = 0.0
+    with torch.no_grad():
+        for images, labels in test_loader:
+            images, labels = images.to(device), labels.to(device)
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+            running_loss += loss.item()
+
+            probs = torch.softmax(outputs, dim=1)
+            max_conf, preds = probs.max(dim=1)
+
+            for i in range(len(labels)):
+                if max_conf[i] < threshold:
+                    continue  # Uncertain: 정확도 계산에서 제외
+                total += 1
+                correct += int(preds[i] == labels[i])
+
+    acc = 100. * correct / total if total > 0 else 0.0
+    return running_loss / len(test_loader), acc
+
 def get_device():
     """
     사용 가능한 최적의 디바이스 선택
@@ -133,12 +214,10 @@ def main():
         print(f"GPU Memory Allocated: {torch.cuda.memory_allocated(0)/1024**2:.2f} MB")
         print(f"GPU Memory Cached: {torch.cuda.memory_reserved(0)/1024**2:.2f} MB")
     
-    # 데이터 로더 설정
-    train_transforms, data_transforms = get_transforms()
-    
-    train_dataset = datasets.ImageFolder(args.train, transform=train_transforms)
-    val_dataset = datasets.ImageFolder(args.val, transform=data_transforms)
-    test_dataset = datasets.ImageFolder(args.test, transform=data_transforms)
+    # 데이터셋 로드
+    train_dataset = PTTensorDataset(args.train, augment=args.augment)
+    val_dataset   = PTTensorDataset(args.val,   augment=False)
+    test_dataset  = PTTensorDataset(args.test,  augment=False)
     
     # 데이터 로더 설정 시 worker 수 최적화
     num_workers = 4 if device.type == 'cuda' else 0
@@ -211,8 +290,11 @@ def main():
 
         # 최종 테스트
         test_loss, test_acc = validate(model, test_loader, criterion, device)
-        print(f"Final Test Accuracy: {test_acc:.2f}%")
-        mlflow.log_metric('test_accuracy', test_acc)
+        print(f"Final Test Accuracy (all samples): {test_acc:.2f}%")
+        mlflow.log_metric('test_accuracy_all', test_acc)
+        test_loss_triage, test_acc_triage = evaluate_with_soft_triage(model, test_loader, device, threshold=0.65)
+        print(f"Final Test Accuracy (excluding Uncertain): {test_acc_triage:.2f}%")
+        mlflow.log_metric('test_accuracy_excluding_uncertain', test_acc_triage)
 
 if __name__ == '__main__':
     main()
