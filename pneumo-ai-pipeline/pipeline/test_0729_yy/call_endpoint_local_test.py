@@ -8,7 +8,7 @@ import os
 # -----------------------------------------------------
 
 # (1) 엔드포인트 정보
-endpoint_name = 'say1-4team-realtime-endpoint2025-07-31-07-56-05'
+endpoint_name = 'say1-4team-inference-endpoint-2025-08-01-05-02-05'
 aws_region = 'ap-northeast-2' # 서울 리전
 
 # (2) 이미지 경로
