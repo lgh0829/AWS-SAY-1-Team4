@@ -22,10 +22,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 라우터 등록
-# app/api/webhook.py에 정의된 엔드포인트 연결
-app.include_router(webhook.router, prefix="/api/webhook", tags=["Webhook"])
-
 # 헬스 체크용 기본 URL
 @app.get("/")
 async def root():

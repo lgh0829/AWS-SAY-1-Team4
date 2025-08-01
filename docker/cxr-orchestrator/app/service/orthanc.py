@@ -2,6 +2,7 @@ import httpx
 from pathlib import Path
 from app.core.config import settings
 import os
+# import requests
 
 ORTHANC_AUTH = (settings.ORTHANC_USERNAME, settings.ORTHANC_PASSWORD)
 
@@ -9,16 +10,26 @@ ORTHANC_AUTH = (settings.ORTHANC_USERNAME, settings.ORTHANC_PASSWORD)
 def _orthanc_url(path: str) -> str:
     return f"{settings.ORTHANC_URL.rstrip('/')}/{path.lstrip('/')}"
 
-
-async def get_instance_ids_from_study(study_uid: str) -> list[str]:
+async def get_instance_info(study_uid: str) -> str | None:
     """
-    StudyInstanceUID로부터 관련된 InstanceUID 목록을 반환
+    주어진 StudyInstanceUID에서 첫 번째 InstanceUID를 반환.
     """
-    url = _orthanc_url(f"/studies/{study_uid}")
+    study_url = _orthanc_url(f"/studies/{study_uid}")
     async with httpx.AsyncClient(auth=ORTHANC_AUTH) as client:
-        resp = await client.get(url)
-        resp.raise_for_status()
-        return resp.json().get("Instances", [])
+        resp = await client.get(study_url)
+        if resp.status_code != 200:
+            return None
+        study_info = resp.json()
+
+        for series_id in study_info.get("Series", []):
+            series_url = _orthanc_url(f"/series/{series_id}")
+            series_resp = await client.get(series_url)
+            series_resp.raise_for_status()
+            series_info = series_resp.json()
+
+            for instance_id in series_info.get("Instances", []):
+                return instance_id
+    return None
 
 
 async def download_dicom(instance_uid: str, output_dir: Path) -> Path:
@@ -57,13 +68,13 @@ import asyncio
 
 async def example_usage():
     study_uid = "1.2.3"  # 실제 존재하는 StudyInstanceUID로 바꿔야 함
-    output_dir = Path("downloads")
-    output_dir.mkdir(exist_ok=True)
+    output_dir = Path("app/output")
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    instance_ids = await get_instance_ids_from_study(study_uid)
-    print(f"Instances for study {study_uid}: {instance_ids}")
+    instance_id = await get_instance_info(study_uid)
+    print(f"Instance for study {study_uid}: {instance_id}")
 
-    for instance_id in instance_ids:
+    if instance_id:
         dcm_path = await download_dicom(instance_id, output_dir)
         print(f"Downloaded DICOM to {dcm_path}")
 
