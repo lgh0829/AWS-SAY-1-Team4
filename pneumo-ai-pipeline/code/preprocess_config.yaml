@@ -1,0 +1,23 @@
+preprocessing:
+  params:
+    clahe:
+      clip_limit: 2.0
+      grid_size:
+      - 8
+      - 8
+    gaussian_blur:
+      radius: 0.2
+    min_max_stretch:
+      lower_percentile: 1
+      upper_percentile: 99
+    sharpening:
+      percent: 150
+      radius: 2
+      threshold: 3
+  steps:
+    apply_clahe: true
+    apply_gaussian_blur: true
+    apply_min_max_stretch: true
+    apply_sharpening: false
+    convert_grayscale: true
+    convert_to_rgb: false

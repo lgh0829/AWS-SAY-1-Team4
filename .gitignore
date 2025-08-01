@@ -51,6 +51,10 @@ experiments/
 **/data/
 **/data/**
 data/
+<<<<<<< HEAD
 **/data-raw/
 **/data-raw/**
 data-raw/
+=======
+**/data-raw/**
+>>>>>>> dev/gumi

@@ -14,7 +14,7 @@ your-repo/
 │   │   └── data/                   # 볼륨 mount용 폴더 (빈 채로 두세요)
 │   └── README.md                   # Docker 실행 가이드
 │
-├── fastapi/                        # (선택) FastAPI 백엔드
+├── cxr-orchestrator/                        # (선택) FastAPI 백엔드
 │   ├── main.py
 │   ├── requirements.txt
 │   └── Dockerfile

@@ -30,12 +30,13 @@ def parse_args():
     return parser.parse_args()
 
 def get_transforms():
+
     data_transforms = transforms.Compose([
         transforms.Grayscale(num_output_channels=1),  # ✅ 핵심
         transforms.Resize((224, 224)),
         transforms.ToTensor(),
         transforms.Normalize([0.5], [0.5])
-])
+        ])
 
     
     train_transforms = transforms.Compose([
@@ -46,7 +47,8 @@ def get_transforms():
         transforms.ColorJitter(brightness=0.15, contrast=0.2),
         transforms.ToTensor(),
         transforms.Normalize([0.5], [0.5])  # ✅ 1채널 정규화
-])
+        ])
+
 
     
     return train_transforms, data_transforms

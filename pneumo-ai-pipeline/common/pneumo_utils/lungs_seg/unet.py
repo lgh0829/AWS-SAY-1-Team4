@@ -6,25 +6,25 @@ import torch
 from torch import nn
 
 from torch.utils import model_zoo
-from .densenet import densenet121, densenet169, densenet161
+# from .densenet import densenet121, densenet169, densenet161
 
 from . import resnet as resnet
-from .senet import (
-    se_resnext50_32x4d,
-    se_resnext101_32x4d,
-    SCSEModule,
-    senet154,
-)
+# from .senet import (
+#     se_resnext50_32x4d,
+#     se_resnext101_32x4d,
+#     SCSEModule,
+#     senet154,
+# )
 
 
 encoder_params = {
-    "resnet18": {
-        "filters": [64, 64, 128, 256, 512],
-        "decoder_filters": [64, 128, 256, 256],
-        "last_upsample": 64,
-        "init_op": partial(resnet.resnet18, in_channels=3),
-        "url": resnet.model_urls["resnet18"],
-    },
+    # "resnet18": {
+    #     "filters": [64, 64, 128, 256, 512],
+    #     "decoder_filters": [64, 128, 256, 256],
+    #     "last_upsample": 64,
+    #     "init_op": partial(resnet.resnet18, in_channels=3),
+    #     "url": resnet.model_urls["resnet18"],
+    # },
     "resnet34": {
         "filters": [64, 64, 128, 256, 512],
         "decoder_filters": [64, 128, 256, 256],
@@ -32,67 +32,67 @@ encoder_params = {
         "init_op": partial(resnet.resnet34, in_channels=3),
         "url": resnet.model_urls["resnet34"],
     },
-    "resnet101": {
-        "filters": [64, 256, 512, 1024, 2048],
-        "decoder_filters": [64, 128, 256, 256],
-        "last_upsample": 64,
-        "init_op": partial(resnet.resnet101, in_channels=3),
-        "url": resnet.model_urls["resnet101"],
-    },
-    "resnet50": {
-        "filters": [64, 256, 512, 1024, 2048],
-        "decoder_filters": [64, 128, 256, 256],
-        "last_upsample": 64,
-        "init_op": partial(resnet.resnet50, in_channels=3),
-        "url": resnet.model_urls["resnet50"],
-    },
-    "densenet121": {
-        "filters": [64, 256, 512, 1024, 1024],
-        "decoder_filters": [64, 128, 256, 256],
-        "last_upsample": 64,
-        "url": None,
-        "init_op": densenet121,
-    },
-    "densenet169": {
-        "filters": [64, 256, 512, 1280, 1664],
-        "decoder_filters": [64, 128, 256, 256],
-        "last_upsample": 64,
-        "url": None,
-        "init_op": densenet169,
-    },
-    "densenet161": {
-        "filters": [96, 384, 768, 2112, 2208],
-        "decoder_filters": [64, 128, 256, 256],
-        "last_upsample": 64,
-        "url": None,
-        "init_op": densenet161,
-    },
-    "densenet161_fatter": {
-        "filters": [96, 384, 768, 2112, 2208],
-        "decoder_filters": [128, 128, 256, 256],
-        "last_upsample": 128,
-        "url": None,
-        "init_op": densenet161,
-    },
-    "seresnext50": {
-        "filters": [64, 256, 512, 1024, 2048],
-        "decoder_filters": [64, 128, 256, 384],
-        "init_op": se_resnext50_32x4d,
-        "url": "http://data.lip6.fr/cadene/pretrainedmodels/se_resnext50_32x4d-a260b3a4.pth",
-    },
-    "senet154": {
-        "filters": [128, 256, 512, 1024, 2048],
-        "decoder_filters": [64, 128, 256, 384],
-        "init_op": senet154,
-        "url": "http://data.lip6.fr/cadene/pretrainedmodels/senet154-c7b49a05.pth",
-    },
-    "seresnext101": {
-        "filters": [64, 256, 512, 1024, 2048],
-        "decoder_filters": [64, 128, 256, 384],
-        "last_upsample": 64,
-        "init_op": se_resnext101_32x4d,
-        "url": "http://data.lip6.fr/cadene/pretrainedmodels/se_resnext101_32x4d-3b2fe3d8.pth",
-    },
+    # "resnet101": {
+    #     "filters": [64, 256, 512, 1024, 2048],
+    #     "decoder_filters": [64, 128, 256, 256],
+    #     "last_upsample": 64,
+    #     "init_op": partial(resnet.resnet101, in_channels=3),
+    #     "url": resnet.model_urls["resnet101"],
+    # },
+    # "resnet50": {
+    #     "filters": [64, 256, 512, 1024, 2048],
+    #     "decoder_filters": [64, 128, 256, 256],
+    #     "last_upsample": 64,
+    #     "init_op": partial(resnet.resnet50, in_channels=3),
+    #     "url": resnet.model_urls["resnet50"],
+    # },
+    # "densenet121": {
+    #     "filters": [64, 256, 512, 1024, 1024],
+    #     "decoder_filters": [64, 128, 256, 256],
+    #     "last_upsample": 64,
+    #     "url": None,
+    #     "init_op": densenet121,
+    # },
+    # "densenet169": {
+    #     "filters": [64, 256, 512, 1280, 1664],
+    #     "decoder_filters": [64, 128, 256, 256],
+    #     "last_upsample": 64,
+    #     "url": None,
+    #     "init_op": densenet169,
+    # },
+    # "densenet161": {
+    #     "filters": [96, 384, 768, 2112, 2208],
+    #     "decoder_filters": [64, 128, 256, 256],
+    #     "last_upsample": 64,
+    #     "url": None,
+    #     "init_op": densenet161,
+    # },
+    # "densenet161_fatter": {
+    #     "filters": [96, 384, 768, 2112, 2208],
+    #     "decoder_filters": [128, 128, 256, 256],
+    #     "last_upsample": 128,
+    #     "url": None,
+    #     "init_op": densenet161,
+    # },
+    # "seresnext50": {
+    #     "filters": [64, 256, 512, 1024, 2048],
+    #     "decoder_filters": [64, 128, 256, 384],
+    #     "init_op": se_resnext50_32x4d,
+    #     "url": "http://data.lip6.fr/cadene/pretrainedmodels/se_resnext50_32x4d-a260b3a4.pth",
+    # },
+    # "senet154": {
+    #     "filters": [128, 256, 512, 1024, 2048],
+    #     "decoder_filters": [64, 128, 256, 384],
+    #     "init_op": senet154,
+    #     "url": "http://data.lip6.fr/cadene/pretrainedmodels/senet154-c7b49a05.pth",
+    # },
+    # "seresnext101": {
+    #     "filters": [64, 256, 512, 1024, 2048],
+    #     "decoder_filters": [64, 128, 256, 384],
+    #     "last_upsample": 64,
+    #     "init_op": se_resnext101_32x4d,
+    #     "url": "http://data.lip6.fr/cadene/pretrainedmodels/se_resnext101_32x4d-3b2fe3d8.pth",
+    # },
 }
 
 

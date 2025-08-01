@@ -207,7 +207,12 @@ class ModelRegistry:
             model = xrv.models.ResNet(weights="resnet50-res512-all")
             in_features = model.model.fc.in_features
             model.model.fc = torch.nn.Linear(in_features, num_classes)
+            model.op_threshs = None
             model.n_outputs = num_classes
+            model.pathologies = [f"class_{i}" for i in range(num_classes)]
+        elif weights == "IMAGENET1K_V1":
+            model = models.resnet50(weights='IMAGENET1K_V1')
+            model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
         else:
             model = models.resnet50(weights=None)
             model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
@@ -308,7 +313,7 @@ def main():
     try:
         bucket_name=config['s3']['bucket_name']
         model_path=f"{config['s3']['prefix']}/output/{config['s3']['job_name']}/output/model.tar.gz"
-        results_dir=Path(__file__).parent.parent / f'{config["local"]["result_dir"]}-{config["s3"]["job_name"]}'
+        results_dir=Path(__file__).parent.parent / f'{config["local"]["result_dir"]}/{config["s3"]["job_name"]}'
         weights = config['model'].get('pretrained_weight', None)
         
         model = load_model(
@@ -323,7 +328,18 @@ def main():
     except Exception as e:
         print(f's3://{bucket_name}/{model_path}')
         print(f"모델 로드 실패: {str(e)}")
-        return
+
+        try: 
+            # 로컬 모델 로드
+            model = get_model(
+                model_type=config['model']['type'],
+                num_classes=config['model']['num_classes'],
+                weights=weights
+            ).to(device)
+            print("로컬 모델 로드 성공")
+        except Exception as e:
+            print(f"로컬 모델 로드 실패: {str(e)}")
+            return
     
     # 테스트 데이터 로드
     transform = transforms.Compose([
