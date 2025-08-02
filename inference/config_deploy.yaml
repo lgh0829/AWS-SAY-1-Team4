@@ -1,0 +1,18 @@
+infernece_type: "classification"  # "segmentation"or "classification"
+base_job_name: "say1-4team-classification"
+
+S3:
+  prefix: "cxr-pneumonia-4/models/"
+  output_path: "cxr-pneumonia-4/output/aws-say1-4team-2025-07-20-15-18-09-2025-07-20-06-18-09-045/output/model.tar.gz"
+
+Sagemaker:
+  instance_type: "ml.m5.large"
+  instance_count: 1
+  framework_version: "1.13.1"
+  py_version: "py39"
+  tags:
+    Key: "project"
+    Value: "pre-4team"
+
+local:
+  files_dir: "endpoint_seg"

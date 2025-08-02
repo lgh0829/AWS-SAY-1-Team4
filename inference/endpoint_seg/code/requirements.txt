@@ -1,0 +1,26 @@
+# PyTorch Core Dependencies (Compatible with CUDA 11.6)
+torch==1.13.1
+torchvision==0.14.1
+
+# TorchServe for Model Serving
+torchserve==0.8.2
+torch-model-archiver==0.8.2
+
+# GPU Monitoring (Compatible versions for TorchServe 0.8.2)
+pynvml==11.4.1
+
+# Image Processing
+Pillow>=9.0.0,<10.0.0
+opencv-python-headless>=4.5.0,<4.8.0
+albumentations>=1.2.0,<1.4.0
+
+# Numerical Computing
+numpy>=1.21.0,<1.26.0
+
+# SageMaker Integration
+sagemaker-pytorch-inference
+
+# Utility Libraries
+retrying
+
+nvgpu==0.10.0
