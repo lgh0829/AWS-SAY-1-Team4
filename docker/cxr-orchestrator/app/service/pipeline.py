@@ -20,7 +20,7 @@ async def run_inference_pipeline(study_uid: str, output_dir: Path) -> dict:
     s3.upload_file(local_path=jpg_path, study_uid=study_uid, subfolder="raw", filename=f"{instance_uid}.jpg")
 
     # 5. SageMaker 호출: segmentation
-    result = sagemaker.invoke_segmentation(jpg_path)
+    result = sagemaker.invoke_segmentation(jpg_path, study_uid)
 
     # 6. DB 저장
     db.insert_result(study_uid, result)
