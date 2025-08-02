@@ -1,5 +1,5 @@
-infernece_type: "classification"  # "segmentation"or "classification"
-base_job_name: "say1-4team-classification"
+infernece_type: "segmentation"  # "segmentation"or "classification"
+base_job_name: "say1-4team-seg"
 
 S3:
   prefix: "cxr-pneumonia-4/models/"

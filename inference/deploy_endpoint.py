@@ -185,6 +185,8 @@ def deploy_model_to_sagemaker(config_path, role_arn=SAGEMAKER_ROLE_ARN):
             endpoint_name=f'{config['base_job_name']}-{timestamp}',
             tags=[{'Key': key, 'Value': value}]
         )
+        if model_path.exists():
+            model_path.unlink()
     else:
         raise ValueError("Invalid inference type specified in the configuration file. Use 'classification' or 'segmentation'.")
 
