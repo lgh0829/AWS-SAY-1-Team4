@@ -1,4 +1,0 @@
-model:
-  num_classes: 3
-  pretrained_weight: IMAGENET1K_V1
-  type: resnet34
