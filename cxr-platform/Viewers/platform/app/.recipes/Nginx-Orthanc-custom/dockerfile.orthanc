@@ -1,0 +1,5 @@
+FROM jodogne/orthanc-plugins:1.12.3
+
+# Lua 스크립트와 설정 복사
+COPY config/orthanc.json /etc/orthanc/
+COPY config/webhook.lua /etc/orthanc/webhook.lua

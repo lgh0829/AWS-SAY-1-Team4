@@ -1,0 +1,15 @@
+{
+  "name": "extension-report",
+  "version": "0.0.1",
+  "description": "OHIF Extension for Report Panel",
+  "author": "OHIF",
+  "license": "MIT",
+  "main": "src/index.tsx",
+  "files": [
+    "src/**"
+  ],
+  "peerDependencies": {
+    "@ohif/core": "^3.0.0",
+    "react": "^17.0.2"
+  }
+}

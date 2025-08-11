@@ -1,0 +1,25 @@
+FROM node:20.18.1-slim
+
+# Setup the working directory
+WORKDIR /app
+
+# Install dependencies
+# apt-get update is combined with apt-get install to avoid using outdated packages
+RUN apt-get update && apt-get install -y build-essential python3
+
+# Copy the entire source code first
+COPY ./ /app/
+
+# Configure yarn workspaces and install dependencies
+RUN yarn config set workspaces-experimental true
+RUN yarn install
+
+# Set development environment
+ENV NODE_ENV=development
+ENV APP_CONFIG=config/default.js
+
+# Expose development port
+EXPOSE 3000
+
+# Start development server
+CMD ["yarn", "run", "dev"]
