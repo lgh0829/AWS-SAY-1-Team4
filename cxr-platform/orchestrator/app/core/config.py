@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     CLASSIFICATION_ENDPOINT: str
 
     BEDROCK_API_ENDPOINT: str
+    BEDROCK_KB_ID: str
+    BEDROCK_KB_MODEL_ID: str
 
     MYSQL_HOST: str
     MYSQL_PORT: int
