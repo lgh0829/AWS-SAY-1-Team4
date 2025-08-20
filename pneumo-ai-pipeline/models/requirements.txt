@@ -5,12 +5,15 @@ torchaudio==0.13.1  # PyTorch 오디오 관련 기능용
 numpy==1.26.4
 pillow==11.3.0
 timm==0.6.13
+kornia==0.7.2
+opencv-python-headless==4.10.0.84
 
-# MLflow and dependencies
-mlflow==2.8.1
-protobuf>=3.12.0,<5.0.0
-setuptools>=65.5.1
-importlib-metadata>=6.0.0
+# # MLflow and plugin for SageMaker
+# mlflow-skinny==2.13.2
+# sagemaker-mlflow==0.1.0
+
+# Logging
+tensorboard==2.17.1
 
 # AWS packages
 boto3>=1.39.6  # S3 접근용

@@ -65,7 +65,7 @@ def check_s3_images(session, bucket, prefix):
     s3_client = session.boto_session.client('s3')
     
     # 이미지 파일 확장자
-    image_extensions = {'.jpg', '.jpeg', '.png'}
+    image_extensions = {'.jpg', '.jpeg', '.png', '.npz'}
     
     try:
         # S3 객체 리스트 가져오기
@@ -130,14 +130,13 @@ def run_training():
         timestamp = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
         base_job_name = f"{config['base_job_name']}-{timestamp}"
         
-        # MLflow 환경 변수 설정
-        environment = {}
-        if config.get('mlflow') and config['mlflow'].get('tracking_uri'):
-            environment.update({
-                'MLFLOW_TRACKING_URI': config['mlflow']['tracking_uri'],
-                'MLFLOW_EXPERIMENT_NAME': config['mlflow'].get('experiment_name', 'default')
-            })
-        
+        # environment = {}
+        # if config.get('mlflow') and config['mlflow'].get('tracking_arn'):
+        #     environment.update({
+        #         'MLFLOW_TRACKING_ARN': config['mlflow']['tracking_arn'],
+        #         'MLFLOW_EXPERIMENT_NAME': config['mlflow'].get('experiment_name', 'default')
+        #     })
+
         # Estimator 생성
         estimator = PyTorch(
             entry_point=config['entry_point'],
@@ -153,7 +152,7 @@ def run_training():
             output_path=f"s3://{bucket_name}/{s3_config['prefix']}/output",
             code_location=f"s3://{bucket_name}/{s3_config['prefix']}/code",
             requirements_file=str(requirements_path),
-            environment=environment,
+            # environment=environment,
             tags=[{'Key': 'project', 'Value': 'pre-4team'}]
         )
         

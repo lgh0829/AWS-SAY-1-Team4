@@ -73,3 +73,65 @@ early stopping patience 설정 가능
 |Youden’s Index|TPR + TNR - 1 (임계값 선택에 사용)|
 |Balanced Accuracy|(Sensitivity + Specificity) / 2|
 |Dice Coefficient|주로 segmentation 모델에서 예측 mask와 정답 mask의 유사도 (IoU와 유사)|
+
+## 전처리 파이프라인 (.npz 확장자)
+```
+ ┌──────────────────────────┐
+ │        RAW IMAGE         │  (DICOM → JPEG, PNG 등)
+ └─────────────┬────────────┘
+               │
+               ▼
+     [Segmentation 단계]
+ ┌──────────────────────────┐
+ │ Resize (Letterbox, 512) │
+ │ Convert → Gray (옵션)    │
+ │ Lung Segmentation Model │
+ └─────────────┬────────────┘
+               │
+               ▼
+      Segmentation Mask (512x512, 1채널)
+               │
+               ▼
+     [Preprocessing 단계]
+ ┌──────────────────────────┐
+ │ Crop/Apply mask          │
+ │ Grayscale / RGB 변환     │
+ │ CLAHE / Gaussian Blur    │
+ │ Min-Max Stretching       │
+ │ Sharpening (옵션)        │
+ │ Resize (224x224)         │
+ └─────────────┬────────────┘
+               │
+               ▼
+ ┌──────────────────────────┐
+ │     Classification Input │
+ │   - Image (224x224x3)    │
+ │   - Mask  (224x224x1)    │
+ └─────────────┬────────────┘
+               │
+               ▼
+       [NPZ 변환 단계]
+ ┌──────────────────────────┐
+ │ Save .npz file           │
+ │ → shape (224,224,4)      │
+ │   [R, G, B, Mask]        │
+ │ Filename: {patient_id}.npz
+ └──────────────────────────┘
+               │
+               ▼
+         Upload to S3
+```
+1.	Segmentation 단계
+	•	입력 이미지를 512×512로 letterbox (aspect ratio 보존 + padding)
+	•	seg_on_gray: True → 세그 모델 입력은 Grayscale 사용
+	•	Lung mask 출력 (1채널, 512×512)
+2.	Preprocessing 단계
+	•	CLAHE, Gaussian blur, min-max stretching 등 이미지 향상
+	•	Classification 입력 크기에 맞게 224×224로 다운샘플링
+	•	RGB 변환이 필요하면 적용 (3채널)
+3.	NPZ 변환
+	•	최종 결과를 224×224×4로 저장
+	•	[R, G, B] + [Mask] → 한 NPZ 파일에 저장
+	•	파일명은 {patient_id}.npz 같은 템플릿 규칙 적용
+4.	업로드
+	•	변환된 npz 파일을 S3 prefix (npz/)로 업로드

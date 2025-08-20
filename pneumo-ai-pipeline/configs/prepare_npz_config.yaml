@@ -1,0 +1,73 @@
+# 처리 단계 설정
+steps:
+  download_from_s3: False
+  segment_lungs: False           # 세그멘테이션 실행
+  preprocess_images: False       # 전처리 실행
+  packing_conversion: False          # npz 파일로 변환 여부
+  upload_to_s3: True
+
+# S3 설정
+s3:
+  bucket_name: "${S3_BUCKET_NAME}"  # S3 버킷 이름
+  prefix: "cxr-pneumonia-5"          # S3 경로
+  input_prefix: "raw"                # 원본 데이터 경로
+  segmented_prefix: "segmented"      # 세그멘테이션 결과 경로
+  preprocessed_prefix: "preprocessed-old" # 전처리 결과 경로
+  packing_prefix: "npz"                  # npz 파일 저장 경로
+
+# 디렉토리 설정
+directories:
+  data_dir: "data"                  # 데이터 디렉토리
+  input_dir: "raw"                  # 원본 데이터 디렉토리
+  segmented_dir: "segmented"        # 세그멘테이션 결과 디렉토리
+  preprocessed_dir: "preprocessed-old"  # 전처리 결과 디렉토리
+  packing_dir: "npz"                    # npz 파일 저장 디렉토리
+
+# 세그멘테이션/리사이즈 관련
+segmentation:
+  input_size: 512               # 모델 입력 크기 (정사각형)
+  resize_strategy: "letterbox"  # 리사이즈 방식: aspect ratio 유지 + 패딩
+  pad_value: 0                  # 패딩값 (0=검은색, 또는 평균 픽셀값 가능)
+  interpolation_image: "area"   # 이미지 보간 방식: area/bilinear 권장
+  interpolation_mask: "nearest" # 마스크 보간: 최근접(경계 깨짐 방지)
+  seg_on_gray: True              # 세그 입력은 GRAY로 사용
+
+# 전처리 옵션 (세그 전/후 공통 전처리에 사용)
+preprocessing:
+  steps:
+    convert_grayscale: True
+    apply_clahe: True
+    apply_gaussian_blur: True
+    apply_min_max_stretch: True
+    apply_sharpening: False
+    save: True
+  params:
+    clahe:
+      clip_limit: 2.0
+      grid_size: [8, 8]
+    gaussian_blur:
+      radius: 0.2
+    min_max_stretch:
+      lower_percentile: 1
+      upper_percentile: 99
+
+# 분류 입력/최종 패킹 해상도 (224x224)
+classification:
+  input_size: 224
+  pad_value: 0
+  interpolation_image: "area"
+
+# NPZ 저장 옵션 (최종 224x224x4)
+npz:
+  target_size: 224                # 최종 패킹 해상도
+  channels: 4                     # RGB(3) + mask(1)
+  include_mask: True
+  image_dtype: "uint8"
+  mask_dtype: "uint8"
+  mask_encoding: "binary_0_255"   # 마스크를 0/255로 이진화
+  output_dir: "npz"               # 저장 디렉토리
+  filename_template: "{study_id}.npz"   # 파일명 템플릿
+  save_meta: True                 # 메타 함께 저장
+  meta_fields: ["study_id", "split", "label", "setname"]
+  compress: True                  # numpy savez_compressed 사용
+  overwrite: True                 # 존재하면 덮어쓰기

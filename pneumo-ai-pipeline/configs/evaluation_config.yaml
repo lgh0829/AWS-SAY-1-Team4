@@ -1,12 +1,12 @@
 # 데이터 설정
 s3:
   bucket_name: "${S3_BUCKET_NAME}"  # S3 버킷 이름
-  prefix: "cxr-pneumonia-4"
-  job_name: "aws-say1-4team-2025-07-20-15-18-09-2025-07-20-06-18-09-045"
+  prefix: "cxr-pneumonia-5"
+  job_name: "aws-say1-4team-2025-08-19-20-30-18-2025-08-19-11-30-18-212"
 local:
   data: 
     data_dir: "data"  # 로컬 데이터 디렉토리
-    test_dir: "test"  # 로컬 테스트 데이터 디렉토리
+    test_dir: "preprocessed-old/test"  # 로컬 테스트 데이터 디렉토리
   result_dir: "results"  # 로컬 성능지표 저장 디렉토리
   output:
     visualization_path: "plot.png"

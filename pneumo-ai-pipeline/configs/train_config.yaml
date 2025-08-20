@@ -1,5 +1,5 @@
 # SageMaker 훈련 설정
-entry_point: "densenet121.py"
+entry_point: "resnet50_binary2_v1.0.py"
 source_dir: "models"
 instance_count: 1
 instance_type: "ml.g4dn.xlarge"  # GPU 인스턴스
@@ -10,26 +10,28 @@ base_job_name: "aws-say1-4team"  # SageMaker 작업 이름
 # 데이터 설정
 s3:
   bucket_name: "${S3_BUCKET_NAME}"  # S3 버킷 이름
-  prefix: "cxr-pneumonia-4"
-  train_prefix: "raw/train"
-  val_prefix: "raw/val"
-  test_prefix: "raw/test"
+  prefix: "cxr-pneumonia-5"
+  train_prefix: "preprocessed-old/train"
+  val_prefix: "preprocessed-old/val"
+  test_prefix: "preprocessed-old/test"
 local:
   data_dir: "../data"  # 로컬 데이터 디렉토리
   train_dir: "train"
   val_dir: "val"
   test_dir: "test"
 
-# MLflow 설정
-mlflow: null
-  #tracking_uri: "http://your-mlflow-server:5000"
- # experiment_name: "pneumoniaClassification"
+# # MLflow 설정
+# mlflow: # null
+#   tracking_arn: "arn:aws:sagemaker:ap-northeast-2:666803869796:mlflow-tracking-server/say1-4team"
+#   experiment_name: "resnet50_3class_img"
 
 # 하이퍼파라미터
 hyperparameters:
   epochs: 200
   batch-size: 32
   learning-rate: 1e-5
-  model-type: "densenet121"
-  num-classes: 3
+  model-type: "resnet50/IMAGENET1K_V1"
+  # num-classes: 3
   patience: 10
+  alpha: 1.0
+  beta: 1.0

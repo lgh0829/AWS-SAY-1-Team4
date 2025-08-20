@@ -19,8 +19,8 @@ class ImagePreprocessor:
             'apply_clahe': True,
             'apply_gaussian_blur': True,
             'apply_min_max_stretch': True,
-            'apply_sharpening': True,
-            'convert_to_rgb': True
+            'apply_sharpening': False,
+            'convert_to_rgb': False
         }
         
         self.params = {

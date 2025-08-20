@@ -28,6 +28,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+*.venv-test/
 
 # Editors
 .vscode/
@@ -53,3 +54,6 @@ data/
 **/data-raw/
 **/data-raw/**
 data-raw/
+**/data-cxr-3/
+**/data-cxr-3/**
+data-cxr-3/
