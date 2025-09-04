@@ -122,7 +122,7 @@ def deploy_model_to_sagemaker(config_path, role_arn=SAGEMAKER_ROLE_ARN):
     instance_type = config['Sagemaker'].get('instance_type', 'ml.m5.large')
     instance_count = config['Sagemaker'].get('instance_count', 1)
     key = config['Sagemaker'].get('key', 'project')
-    value = config['Sagemaker'].get('value', 'pre-4team')
+    value = config['Sagemaker'].get('value', 'pre-say1-4team')
 
     if config['infernece_type'] == 'classification':
         # ─────────────────────────────────────────────────────────────

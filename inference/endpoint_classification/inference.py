@@ -48,7 +48,7 @@ def model_fn(model_dir):
         model.fc = nn.Linear(model.fc.in_features, 3)
         logger.info("ResNet50 모델 구조 정의 완료")
 
-        checkpoint_path = os.path.join(model_dir, "model_last.pth")
+        checkpoint_path = os.path.join(model_dir, "model.pth")
         logger.info(f"모델 가중치 파일 경로: {checkpoint_path}")
 
         if not os.path.exists(checkpoint_path):
@@ -151,26 +151,72 @@ def compute_vanilla_gradients(image, model, transform, device, target_class=None
     return gradients
 
 # ---------------------------------------
-# Helper: 히트맵 시각화 및 S3 업로드
+# Helper: 히트맵 시각화 및 S3 업로드 (COLORMAP_JET + 가중 합성)
 # ---------------------------------------
-def visualize_and_upload_heatmap(raw_image, heatmap, bucket, key, alpha=0.4):
+def visualize_and_upload_heatmap(raw_image, heatmap, bucket, key, alpha=0.7):
+    """
+    raw_image: PIL.Image
+    heatmap: ndarray float32/float64 (H',W'), 0~1 범위 권장
+    alpha: 히트맵 가중치 (0.0~1.0)
+    """
+    # RGB로 변환
     raw_np = np.array(raw_image.convert("RGB"))
     H, W = raw_np.shape[:2]
-    hm_uint8 = (heatmap * 255).astype(np.uint8)
-    hm_resized = cv2.resize(hm_uint8, (W, H))
-    cmap = cv2.applyColorMap(hm_resized, cv2.COLORMAP_HOT)
-    overlay = cv2.addWeighted(raw_np, 1 - alpha, cmap, alpha, 0)
-
-    fig = plt.figure(figsize=(6, 6))
+    
+    # 히트맵 리사이즈 (원본 이미지 크기에 맞게)
+    hm = np.clip(heatmap, 0, 1)  # 안전 클리핑
+    hm_resized = cv2.resize(hm, (W, H), interpolation=cv2.INTER_LINEAR)
+    
+    # 상위 10%의 활성화만 표시 (더 타이트한 임계값)
+    threshold = np.percentile(hm_resized, 98)  # 상위 2%만 표시
+    logger.info(f"히트맵 임계값: {threshold} (상위 10% 활성화)")
+    
+    # 마스크 생성: 임계값 이상인 부분만 히트맵 적용
+    mask = (hm_resized > threshold).astype(np.float32)
+    
+    # 임계값 미만은 0으로, 이상은 원래 값 유지하고 재정규화
+    filtered_hm = hm_resized.copy()
+    filtered_hm[filtered_hm <= threshold] = 0
+    
+    # 최대값으로 재정규화 (0-1 범위)
+    if filtered_hm.max() > 0:
+        filtered_hm = filtered_hm / filtered_hm.max()
+    
+    # 부드러운 히트맵을 위한 블러 적용
+    filtered_hm = cv2.GaussianBlur(filtered_hm, (5, 5), 1.0)
+    
+    # 히트맵에 컬러맵 적용 (0-255 스케일로 변환)
+    hm_uint8 = (filtered_hm * 255).astype(np.uint8)
+    colored_hm = cv2.applyColorMap(hm_uint8, cv2.COLORMAP_JET)
+    
+    # 마스크를 3채널로 확장 (재계산된 마스크)
+    mask = (filtered_hm > 0).astype(np.float32)
+    mask_3d = np.stack([mask] * 3, axis=2)
+    
+    # 마스크된 영역에만 히트맵 적용
+    # 1. 원본 이미지 복사
+    result = raw_np.copy()
+    
+    # 2. 마스크가 있는 부분만 블렌딩 (알파값 계산에 filtered_hm 사용)
+    mask_indices = mask_3d > 0
+    blend_alpha = alpha * filtered_hm[:, :, np.newaxis] * mask_3d  # 값이 클수록 더 강한 오버레이
+    result[mask_indices] = (1 - blend_alpha[mask_indices]) * raw_np[mask_indices] + \
+                           blend_alpha[mask_indices] * colored_hm[mask_indices]
+    
+    # Matplotlib으로 시각화 및 저장
+    fig = plt.figure(figsize=(8, 8))
     ax = fig.add_subplot(111)
     ax.axis('off')
-    ax.imshow(overlay)
-
+    ax.imshow(result)
+    
+    # 메모리에 이미지 저장
     buffer = io.BytesIO()
-    fig.savefig(buffer, format='png', bbox_inches='tight', pad_inches=0)
+    plt.subplots_adjust(left=0, right=1, top=1, bottom=0)  # 여백 제거
+    fig.savefig(buffer, format='png', bbox_inches='tight', pad_inches=0, dpi=150)
     buffer.seek(0)
     plt.close(fig)
 
+    # S3 업로드
     s3 = boto3.client('s3')
     s3.upload_fileobj(buffer, bucket, key)
 
@@ -200,7 +246,7 @@ def predict_fn(input_object, model_context):
         class_idx = torch.argmax(probs).item()
         logger.info(f"모델 예측 완료. 결과 class_id: {class_idx}")
 
-        classes = ["normal", "pneumonia", "not_normal"]
+        classes = ["normal", "pneumonia", "abnormal"]
         result = {
             'class_id': class_idx,
             'class_name': classes[class_idx],
@@ -212,18 +258,23 @@ def predict_fn(input_object, model_context):
         # Vanilla Gradient 히트맵 계산 (primary_image 사용)
         logger.info("Vanilla Gradient 계산 시작")
         gradients = compute_vanilla_gradients(primary_image, model, transform, device, target_class=class_idx)
-        # 히트맵 후처리
+
+        # 히트맵 후처리 - 개선된 버전
         logger.info("히트맵 후처리 시작")
-        gradients = np.abs(gradients)  # 1. 절댓값 적용
-        # 2. 원본 그래디언트에서 임계값 계산 (상위 10%)
+        gradients = np.abs(gradients)  # 절댓값 적용
+
+        # 정확히 상위 10%만 표시하도록 임계값 설정 (attention 90% 이상만 표시)
         thresh = np.percentile(gradients, 90)
-        # 3. 임계값보다 낮은 값들은 0으로 처리
-        grad = np.where(gradients >= thresh, gradients, 0)
-        # 4. 걸러진 값들을 대상으로 0-1 정규화 (시각적 대비 극대화)
+        grad = np.zeros_like(gradients)
+        mask = gradients >= thresh
+        grad[mask] = gradients[mask]
+
+        # 0-1 정규화
         if grad.max() > 0:
             grad = grad / grad.max()
-        # 5. 가우시안 블러로 부드럽게 처리
-        grad = cv2.GaussianBlur(grad, (5, 5), 1.0)
+
+        # 가우시안 블러 적용 (부드러운 히트맵을 위해)
+        grad = cv2.GaussianBlur(grad, (7, 7), 1.5)  # 커널 크기와 시그마 증가
         logger.info("히트맵 계산 및 후처리 완료")
 
         # S3 버킷/키 설정
@@ -242,7 +293,7 @@ def predict_fn(input_object, model_context):
         if heatmap_bucket:
             logger.info("히트맵 시각화 및 S3 업로드 시작")
             # 히트맵 시각화 (background_image 사용)
-            visualize_and_upload_heatmap(background_image, grad, heatmap_bucket, heatmap_key)
+            visualize_and_upload_heatmap(background_image, grad, heatmap_bucket, heatmap_key, alpha=0.6)
             result['heatmap_s3_path'] = f"s3://{heatmap_bucket}/{heatmap_key}"
             logger.info("히트맵 S3 업로드 성공")
         else:

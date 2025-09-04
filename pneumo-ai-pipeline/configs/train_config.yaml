@@ -1,5 +1,5 @@
 # SageMaker 훈련 설정
-entry_point: "resnet50_binary2_v1.0.py"
+entry_point: "efficientnetb0_binary_v1.0.py"
 source_dir: "models"
 instance_count: 1
 instance_type: "ml.g4dn.xlarge"  # GPU 인스턴스
@@ -30,8 +30,6 @@ hyperparameters:
   epochs: 200
   batch-size: 32
   learning-rate: 1e-5
-  model-type: "resnet50/IMAGENET1K_V1"
+  model-type: "efficientnet_b0"
   # num-classes: 3
   patience: 10
-  alpha: 1.0
-  beta: 1.0

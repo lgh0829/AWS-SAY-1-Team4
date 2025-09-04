@@ -2,7 +2,7 @@
 s3:
   bucket_name: "${S3_BUCKET_NAME}"  # S3 버킷 이름
   prefix: "cxr-pneumonia-5"
-  job_name: "aws-say1-4team-2025-08-19-20-30-18-2025-08-19-11-30-18-212"
+  job_name: "aws-say1-4team-2025-08-21-10-28-36-2025-08-21-01-28-36-821"
 local:
   data: 
     data_dir: "data"  # 로컬 데이터 디렉토리
@@ -15,5 +15,5 @@ local:
 # 모델 정보
 model:
   type: "resnet50"  # 모델 이름
-  num_classes: 3    # 클래스 수
-  pretrained_weight: "IMAGENET1K_V1"  # 사전 훈련된 모델 사용 여부
+  num_classes: 2    # 클래스 수
+  pretrained_weight: IMAGENET1K_V2  # 사전 훈련된 모델 사용 여부

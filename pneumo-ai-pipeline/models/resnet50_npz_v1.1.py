@@ -271,6 +271,18 @@ def validate(model, val_loader, criterion, device):
 
     return val_loss / len(val_loader), 100. * correct / total
 
+# def test_only(model, test_loader, device):
+#     model.eval()
+#     results = []
+
+#     with torch.no_grad():
+#         for images in test_loader:
+#             images = images.to(device)
+#             raw_output = model(images)
+#             outputs = raw_output.logits if hasattr(raw_output, "logits") else raw_output
+#             predicted = outputs.argmax(dim=1).cpu().numpy()
+#             results.extend(predicted.tolist())
+#     return results
 
 def get_device():
     if torch.cuda.is_available():
@@ -307,7 +319,7 @@ def build_loaders(args, device):
     sampler = WeightedRandomSampler(sample_weights, num_samples=len(sample_weights), replacement=True)
     print(f"Class distribution: {class_count}")
 
-    num_workers = 4 if device.type == 'cuda' else 0
+    num_workers = 0 if device.type == 'cuda' else 0
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, sampler=sampler,
                               num_workers=num_workers, pin_memory=(device.type=='cuda'))
     val_loader   = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False,
@@ -377,7 +389,10 @@ def main():
         scheduler.step(val_acc)
 
     # Test
-    test_loss, test_acc = validate(model, test_loader, criterion, device)
+    # test_results = test_only(model, test_loader, device)
+    # print(f"Final Test Accuracy: {test_results:.2f}%")
+    # writer.add_scalar('Acc/test', test_results, 0)
+    test_acc = validate(model, test_loader, criterion, device)
     print(f"Final Test Accuracy: {test_acc:.2f}%")
     writer.add_scalar('Acc/test', test_acc, 0)
     writer.close()

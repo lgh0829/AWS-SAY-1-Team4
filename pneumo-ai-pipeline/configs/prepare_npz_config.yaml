@@ -1,24 +1,24 @@
 # 처리 단계 설정
 steps:
-  download_from_s3: False
-  segment_lungs: False           # 세그멘테이션 실행
-  preprocess_images: False       # 전처리 실행
-  packing_conversion: False          # npz 파일로 변환 여부
+  download_from_s3: True
+  segment_lungs: True           # 세그멘테이션 실행
+  preprocess_images: True       # 전처리 실행
+  packing_conversion: True          # npz 파일로 변환 여부
   upload_to_s3: True
 
 # S3 설정
 s3:
   bucket_name: "${S3_BUCKET_NAME}"  # S3 버킷 이름
-  prefix: "cxr-pneumonia-5"          # S3 경로
-  input_prefix: "raw"                # 원본 데이터 경로
+  prefix: "report-dev"          # S3 경로
+  input_prefix: "nofinding"                # 원본 데이터 경로
   segmented_prefix: "segmented"      # 세그멘테이션 결과 경로
   preprocessed_prefix: "preprocessed-old" # 전처리 결과 경로
   packing_prefix: "npz"                  # npz 파일 저장 경로
 
 # 디렉토리 설정
 directories:
-  data_dir: "data"                  # 데이터 디렉토리
-  input_dir: "raw"                  # 원본 데이터 디렉토리
+  data_dir: "report-dev"                  # 데이터 디렉토리
+  input_dir: "nofinding"                  # 원본 데이터 디렉토리
   segmented_dir: "segmented"        # 세그멘테이션 결과 디렉토리
   preprocessed_dir: "preprocessed-old"  # 전처리 결과 디렉토리
   packing_dir: "npz"                    # npz 파일 저장 디렉토리

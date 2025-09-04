@@ -5,6 +5,7 @@ __pycache__/
 *.pyo
 *.gz
 *.pth
+*.pt
 
 # Distribution / packaging
 .Python

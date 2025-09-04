@@ -12,9 +12,17 @@ except ImportError:
     from models.unet import Resnet   # When running directly
 import json
 
-# 이미지 전처리 정의
+# 이미지 전처리 정의 (패딩 적용)
 IMG_SIZE = 512
-aug = A.Compose([A.Resize(IMG_SIZE, IMG_SIZE, interpolation=1, p=1)], p=1)
+aug = A.Compose([
+    A.LongestMaxSize(IMG_SIZE, interpolation=1),  # 긴 축을 기준으로 리사이즈
+    A.PadIfNeeded(
+        min_height=IMG_SIZE,
+        min_width=IMG_SIZE,
+        border_mode=cv2.BORDER_CONSTANT,
+        value=0
+    )
+], p=1)
 
 # 디바이스 설정
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -64,6 +72,9 @@ def predict_fn(inputs, model):
     elif image.shape[2] == 1:
         image = np.concatenate([image] * 3, axis=2)
 
+    # 이미지 크기 정보 저장
+    orig_h, orig_w = image.shape[:2]
+    
     # 3. 전처리 (resize → tensor 변환)
     augs = aug(image=image)
     image_aug = augs["image"].transpose((2, 0, 1))  # HWC → CHW
@@ -83,11 +94,13 @@ def predict_fn(inputs, model):
     mask_path = f"/tmp/{uid}_mask.npy"
     overlay_path = f"/tmp/{uid}_overlay.png"
 
+    # 마스크를 원본 크기로 복원하기 전에 저장
     np.save(mask_path, np.stack([left_lung_mask, right_lung_mask], axis=0))  # (2, H, W)
 
     # 7. 오버레이 생성 (lung region만 보이도록 마스킹)
     mask_combined = np.clip(left_lung_mask + right_lung_mask, 0, 1)
-    mask_resized = cv2.resize(mask_combined, (image.shape[1], image.shape[0]), interpolation=cv2.INTER_NEAREST)
+    # 원본 종횡비로 복원 (정확한 원본 크기와 일치하도록)
+    mask_resized = cv2.resize(mask_combined, (orig_w, orig_h), interpolation=cv2.INTER_NEAREST)
     
     # 원본 이미지를 흑색 배경 위에 마스크 영역만 살리는 방식
     image_uint8 = (image * 255).astype(np.uint8) if image.max() <= 1.0 else image

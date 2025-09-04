@@ -4,6 +4,8 @@ from pathlib import Path
 import logging
 from app.service import orthanc, s3, sagemaker, convert, db
 import pydicom
+import numpy as np
+import cv2
 
 async def run_inference_pipeline(orthanc_id: str, dicom_study_uid: str, output_dir: Path) -> dict:
     # 1. DICOM 정보 조회 - Orthanc ID 사용
@@ -65,3 +67,30 @@ async def run_inference_pipeline(orthanc_id: str, dicom_study_uid: str, output_d
     await orthanc.mark_study_as_processed(orthanc_id)
     
     return {"message": f"{dicom_study_uid} uploaded successfully"}
+
+def visualize_and_upload_heatmap(raw_image, heatmap, bucket, key, alpha=0.7):
+    # RGB로 변환
+    raw_np = np.array(raw_image.convert("RGB"))
+    H, W = raw_np.shape[:2]
+    
+    # 히트맵 리사이즈 및 정규화
+    hm_resized = cv2.resize(heatmap, (W, H))
+    
+    # 마스킹: 배경 제거 (임계값 이하는 0으로)
+    threshold = 0.2  # 더 높은 값으로 설정하여 배경 제거
+    hm_masked = np.copy(hm_resized)
+    hm_masked[hm_masked < threshold] = 0
+    
+    # 히트맵 변환 (0-255 스케일)
+    hm_uint8 = np.uint8(255 * hm_masked)
+    
+    # JET 컬러맵 적용
+    heatmap_colored = cv2.applyColorMap(hm_uint8, cv2.COLORMAP_JET)
+    
+    # 원본 이미지와 히트맵 합성 (마스킹된 부분만)
+    mask = (hm_masked > 0).astype(np.float32)[:,:,np.newaxis]
+    overlay = raw_np * (1 - alpha * mask) + heatmap_colored * (alpha * mask)
+    overlay = np.uint8(overlay)
+    
+    # 이미지 저장 및 업로드
+    # ...나머지 코드는 동일

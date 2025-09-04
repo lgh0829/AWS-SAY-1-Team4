@@ -163,8 +163,8 @@ def prepare_training_data(config_path: str):
         proc = ImageProcessor()
         total = 0
         # # ######### **** 약간 변경 **** #########
-        # for src_path in iter_image_files(str(segmented_dir / "masked")):
-        for src_path in iter_image_files(str(input_dir)):
+        for src_path in iter_image_files(str(segmented_dir / "masked")):
+        # for src_path in iter_image_files(str(input_dir)):
             rel = rel_to(str(input_dir), src_path)
             out_pre_path = preprocessed_dir / rel.with_suffix(".png")  # keep same suffix
             ensure_parent(out_pre_path)
@@ -248,32 +248,32 @@ def prepare_training_data(config_path: str):
     else:
         print("[Skip] NPZ packing step")
 
-    # -----------------------------
-    # 5) Upload to S3
-    # -----------------------------
-    if steps.get("upload_to_s3", False):
-        if not s3:
-            raise ValueError("S3 bucket_name is required for upload.")
-        remote_packing = "/".join([p for p in [s3_prefix_root, s3_packing_prefix] if p])
-        print(f"[S3] Uploading NPZ dir: {packing_dir} -> s3://{bucket}/{remote_packing}")
-        s3.upload_directory(str(packing_dir), remote_packing)
-        print("[S3] Upload complete.")
-    else:
-        print("[Skip] S3 upload step")
-
-    # ######### **** 약간 변경 **** #########
     # # -----------------------------
     # # 5) Upload to S3
     # # -----------------------------
     # if steps.get("upload_to_s3", False):
     #     if not s3:
     #         raise ValueError("S3 bucket_name is required for upload.")
-    #     remote_preprocessed = "/".join([p for p in [s3_prefix_root, s3_preprocessed_prefix] if p])
-    #     print(f"[S3] Uploading NPZ dir: {preprocessed_dir} -> s3://{bucket}/{remote_preprocessed}")
-    #     s3.upload_directory(str(preprocessed_dir), remote_preprocessed)
+    #     remote_packing = "/".join([p for p in [s3_prefix_root, s3_packing_prefix] if p])
+    #     print(f"[S3] Uploading NPZ dir: {packing_dir} -> s3://{bucket}/{remote_packing}")
+    #     s3.upload_directory(str(packing_dir), remote_packing)
     #     print("[S3] Upload complete.")
     # else:
     #     print("[Skip] S3 upload step")
+
+    ######### **** 약간 변경 **** #########
+    # -----------------------------
+    # 5) Upload to S3
+    # -----------------------------
+    if steps.get("upload_to_s3", False):
+        if not s3:
+            raise ValueError("S3 bucket_name is required for upload.")
+        remote_preprocessed = "/".join([p for p in [s3_prefix_root, s3_preprocessed_prefix] if p])
+        print(f"[S3] Uploading NPZ dir: {preprocessed_dir} -> s3://{bucket}/{remote_preprocessed}")
+        s3.upload_directory(str(preprocessed_dir), remote_preprocessed)
+        print("[S3] Upload complete.")
+    else:
+        print("[Skip] S3 upload step")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="학습 데이터셋 준비 (seg + preprocess + npz pack)")
